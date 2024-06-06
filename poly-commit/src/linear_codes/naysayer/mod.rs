@@ -39,25 +39,26 @@ pub enum LinearCodeNaysayerProof {
     EvaluationLie,
 }
 
-impl<L, F, P, S, C, H> LinearCodePCS<L, F, P, S, C, H>
+impl<L, F, P, C, H> LinearCodePCS<L, F, P, C, H>
 where
     L: LinearEncode<F, C, P, H>,
     F: PrimeField + Absorb,
     P: Polynomial<F>,
-    S: CryptographicSponge,
     C: Config + 'static,
     Vec<F>: Borrow<<H as CRHScheme>::Input>,
     H::Output: Into<C::Leaf> + Send,
     C::Leaf: Sized + Clone + Default + Send + AsRef<C::Leaf>,
     H: CRHScheme + 'static,
 {
-    fn naysay<'a>(
+    /// Indicate whether the given proofs are valid or point to their issues,
+    /// producing a naysayer proof
+    pub fn naysay<'a>(
         vk: &L::LinCodePCParams,
         commitments: impl IntoIterator<Item = &'a LabeledCommitment<LinCodePCCommitment<C>>>,
         point: &'a P::Point,
         values: impl IntoIterator<Item = F>,
         proof_array: &LPCPArray<F, C>,
-        sponge: &mut S,
+        sponge: &mut impl CryptographicSponge,
         _rng: Option<&mut dyn RngCore>,
     ) -> Result<LinearCodeNaysayerProof, Error> {
         assert!(
@@ -135,7 +136,7 @@ where
         }
 
         // 5. Compute the encoding w = E(v).
-        let w = L::encode(&proof.opening.v, vk);
+        let w = L::encode(&proof.opening.v, vk)?;
 
         // 6. Compute `a`, `b` to right- and left- multiply with the matrix `M`.
         let (a, b) = L::tensor(point, n_cols, n_rows);
@@ -159,15 +160,22 @@ where
     }
 
     /// Verifies the naysayer proof.
-    /// Returns `true` if the naysayer proof is valid, i.e. the original proof is rejected.
-    fn naysayer_verify<'a>(
+    /// - Returns `Ok(true)` if the original proof is rejected (i.e. the
+    ///   naysayer proof points to a valid issue).
+    /// - Returns `Ok(false)` if the original proof is accepted, i.e.
+    ///     - either the naysayer proof told to accept the original proof
+    ///       ("Aye")
+    ///     - or the naysayer proof points to an invalid issue
+    /// - Returns `Err` if another type of error occurs during verification of
+    ///   the naysayer proof.
+    pub fn naysayer_verify<'a>(
         vk: &L::LinCodePCParams,
         commitments: impl IntoIterator<Item = &'a LabeledCommitment<LinCodePCCommitment<C>>>,
         point: &'a P::Point,
         values: impl IntoIterator<Item = F>,
-        proof_array: LPCPArray<F, C>,
+        proof_array: &LPCPArray<F, C>,
         naysayer_proof: LinearCodeNaysayerProof,
-        sponge: &mut S,
+        sponge: &mut impl CryptographicSponge,
         _rng: Option<&mut dyn RngCore>,
     ) -> Result<bool, Error> {
         let leaf_hash_param: &<<C as Config>::LeafHash as CRHScheme>::Parameters =
@@ -234,7 +242,7 @@ where
                 let indices = get_indices_from_sponge(n_ext_cols, t, sponge)?;
 
                 // 5. Compute the encoding w = E(v).
-                let w = L::encode(&proof.opening.v, vk);
+                let w = L::encode(&proof.opening.v, vk)?;
 
                 let (_, b) = L::tensor(point, n_cols, n_rows);
 

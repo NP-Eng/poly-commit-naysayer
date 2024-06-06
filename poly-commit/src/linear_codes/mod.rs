@@ -21,19 +21,18 @@ use ark_std::vec::Vec;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
-mod utils;
-
+mod brakedown;
+mod data_structures;
+mod ligero;
 mod multilinear_brakedown;
 mod multilinear_ligero;
+mod naysayer;
 mod univariate_ligero;
+mod utils;
 
 pub use multilinear_brakedown::MultilinearBrakedown;
 pub use multilinear_ligero::MultilinearLigero;
 pub use univariate_ligero::UnivariateLigero;
-
-mod brakedown;
-mod data_structures;
-mod ligero;
 
 pub use data_structures::BrakedownPCParams;
 use data_structures::*;
