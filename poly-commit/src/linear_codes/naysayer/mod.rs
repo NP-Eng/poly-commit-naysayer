@@ -252,7 +252,7 @@ where
                         sponge.absorb(&proof.opening.v);
 
                         // 2. Ask random oracle for the `t` indices where the checks happen.
-                        let indices = get_indices_from_sponge(n_ext_cols, t, sponge)?;
+                        let indices = get_indices_from_sponge(n_ext_cols, j + 1, sponge)?;
 
                         // 5. Compute the encoding w = E(v).
                         let w = L::encode(&proof.opening.v, vk)?;
