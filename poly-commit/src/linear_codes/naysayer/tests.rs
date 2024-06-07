@@ -59,21 +59,23 @@ type LigeroPCS<F> = LinearCodePCS<
 // Types of dishonesty that can be introduce in a LinearCodePCS proof
 #[derive(Eq, PartialEq)]
 enum LinearCodeDishonesty {
-    None,         // No dishonesty: same as the open
-    RowLCOutside, // Modify v = bM after honestly producing a
-    //  proof, leading to an inconsistent sponge
-    RowLCInside, // Modify v = bM before feeding it to the
-    //  sponge, leading to a consistent sponge but
-    //  inconsistent check E(b M) = b E(M)
-    Column, // Modify one of the sent columns, leading to a
-    //  failure in the Merkle path verification
-    //  (note that the verifier hashes the column
-    //  into a leaf which is used during path
-    //  verification)
-    MerklePath, // Modify one of the merkle path proofs, leading
-    //  to its incorrect verification
-    Evaluation, // Claim an evaluation y different from the
-                //  actual one f(x)
+    // No dishonesty: same as the open
+    None,
+    // Modify v = bM after honestly producing a proof, leading to an
+    // inconsistent sponge
+    RowLCOutside,
+    // Modify v = bM before feeding it to the sponge, leading to a consistent
+    // sponge but inconsistent check E(b M) = b E(M)
+    RowLCInside,
+    // Modify one of the sent columns, leading to a failure in the Merkle path
+    // verification (note that the verifier hashes the column into a leaf which
+    // is used during path verification)
+    Column,
+    // Modify one of the merkle path proofs, leading to its incorrect
+    //  verification
+    MerklePath,
+    // Claim an evaluation y different from the actual one f(x)
+    Evaluation,
 }
 
 // Auxiliary functions for testying naysayer functionality
