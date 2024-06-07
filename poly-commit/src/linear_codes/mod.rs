@@ -446,7 +446,7 @@ where
 
                 if !path
                     .verify(leaf_hash_param, two_to_one_hash_param, root, leaf.clone())
-                    .map_err(|_| Error::InvalidCommitment)?
+                    .map_err(|_| Error::HashingError)?
                 {
                     return Ok(false);
                 }

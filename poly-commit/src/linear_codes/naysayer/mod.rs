@@ -129,7 +129,7 @@ where
 
             if !path
                 .verify(leaf_hash_param, two_to_one_hash_param, root, leaf.clone())
-                .map_err(|_| Error::InvalidCommitment)?
+                .map_err(|_| Error::HashingError)?
             {
                 return Ok(LinearCodeNaysayerProof::MerklePathLie(j));
             }
@@ -203,50 +203,66 @@ where
 
         match naysayer_proof {
             LinearCodeNaysayerProof::Aye => Ok(false),
-            LinearCodeNaysayerProof::PathIndexLie(i) => {
-                sponge.absorb(&to_bytes!(&commitment.root).map_err(|_| Error::TranscriptError)?);
+            LinearCodeNaysayerProof::PathIndexLie(j)
+            | LinearCodeNaysayerProof::MerklePathLie(j)
+            | LinearCodeNaysayerProof::ColumnInnerProductLie(j) => {
+                if j >= t {
+                    return Ok(false);
+                }
 
-                // 1. Seed the transcript with the point and the recieved vector
-                // TODO Consider removing the evaluation point from the transcript.
-                let point_vec = L::point_to_vec(point.clone());
-                sponge.absorb(&point_vec);
-                sponge.absorb(&proof.opening.v);
+                match naysayer_proof {
+                    LinearCodeNaysayerProof::PathIndexLie(j) => {
+                        sponge.absorb(
+                            &to_bytes!(&commitment.root).map_err(|_| Error::TranscriptError)?,
+                        );
 
-                // 2. Ask random oracle for the `t` indices where the checks happen.
-                let indices = get_indices_from_sponge(n_ext_cols, t, sponge)?;
+                        // 1. Seed the transcript with the point and the recieved vector
+                        // TODO Consider removing the evaluation point from the transcript.
+                        let point_vec = L::point_to_vec(point.clone());
+                        sponge.absorb(&point_vec);
+                        sponge.absorb(&proof.opening.v);
 
-                // check that the index is indeed wrong
-                let path = &proof.opening.paths[i];
-                let q_j = indices[i];
-                Ok(path.leaf_index != q_j)
-            }
-            LinearCodeNaysayerProof::MerklePathLie(j) => {
-                let leaf = H::evaluate(vk.col_hash_params(), proof.opening.columns[j].clone())
-                    .map_err(|_| Error::HashingError)?;
-                let path = &proof.opening.paths[j];
-                let is_path_ok = path
-                    .verify(leaf_hash_param, two_to_one_hash_param, root, leaf.into())
-                    .map_err(|_| Error::InvalidCommitment)?;
-                Ok(!is_path_ok)
-            }
-            LinearCodeNaysayerProof::ColumnInnerProductLie(i) => {
-                sponge.absorb(&to_bytes!(&commitment.root).map_err(|_| Error::TranscriptError)?);
+                        // 2. Ask random oracle for the `t` indices where the checks happen.
+                        let indices = get_indices_from_sponge(n_ext_cols, t, sponge)?;
 
-                // 1. Seed the transcript with the point and the recieved vector
-                // TODO Consider removing the evaluation point from the transcript.
-                let point_vec = L::point_to_vec(point.clone());
-                sponge.absorb(&point_vec);
-                sponge.absorb(&proof.opening.v);
+                        // check that the index is indeed wrong
+                        let path = &proof.opening.paths[j];
+                        let q_j = indices[j];
+                        Ok(path.leaf_index != q_j)
+                    }
+                    LinearCodeNaysayerProof::MerklePathLie(j) => {
+                        let leaf =
+                            H::evaluate(vk.col_hash_params(), proof.opening.columns[j].clone())
+                                .map_err(|_| Error::HashingError)?;
+                        let path = &proof.opening.paths[j];
+                        let is_path_ok = path
+                            .verify(leaf_hash_param, two_to_one_hash_param, root, leaf.into())
+                            .map_err(|_| Error::HashingError)?;
+                        Ok(!is_path_ok)
+                    }
+                    LinearCodeNaysayerProof::ColumnInnerProductLie(j) => {
+                        sponge.absorb(
+                            &to_bytes!(&commitment.root).map_err(|_| Error::TranscriptError)?,
+                        );
 
-                // 2. Ask random oracle for the `t` indices where the checks happen.
-                let indices = get_indices_from_sponge(n_ext_cols, t, sponge)?;
+                        // 1. Seed the transcript with the point and the recieved vector
+                        // TODO Consider removing the evaluation point from the transcript.
+                        let point_vec = L::point_to_vec(point.clone());
+                        sponge.absorb(&point_vec);
+                        sponge.absorb(&proof.opening.v);
 
-                // 5. Compute the encoding w = E(v).
-                let w = L::encode(&proof.opening.v, vk)?;
+                        // 2. Ask random oracle for the `t` indices where the checks happen.
+                        let indices = get_indices_from_sponge(n_ext_cols, t, sponge)?;
 
-                let (_, b) = L::tensor(point, n_cols, n_rows);
+                        // 5. Compute the encoding w = E(v).
+                        let w = L::encode(&proof.opening.v, vk)?;
 
-                Ok(inner_product(&b, &proof.opening.columns[i]) != w[indices[i]])
+                        let (_, b) = L::tensor(point, n_cols, n_rows);
+
+                        Ok(inner_product(&b, &proof.opening.columns[j]) != w[indices[j]])
+                    }
+                    _ => unreachable!(),
+                }
             }
             LinearCodeNaysayerProof::EvaluationLie => {
                 let (a, _) = L::tensor(point, n_cols, n_rows);
