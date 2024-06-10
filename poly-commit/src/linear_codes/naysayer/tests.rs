@@ -71,9 +71,12 @@ enum LinearCodeDishonesty {
     // verification (note that the verifier hashes the column into a leaf which
     // is used during path verification)
     Column,
-    // Modify one of the merkle path proofs, leading to its incorrect
-    //  verification
+    // Modify a node in one of the Merkle path proofs, leading to its incorrect
+    // verification
     MerklePath,
+    // Modify the leaf index in one of the Merkle path proofs, leading to a
+    // mismatch with the query index squeezed from the sponge
+    MerkleLeafIndex(usize),
     // Claim an evaluation y different from the actual one f(x)
     Evaluation,
 }
@@ -226,6 +229,9 @@ where
             LinearCodeDishonesty::MerklePath => {
                 paths[0].auth_path[0] = paths[0].auth_path[1].clone();
             }
+            LinearCodeDishonesty::MerkleLeafIndex(j) => {
+                paths[j].leaf_index += 1;
+            }
             LinearCodeDishonesty::RowLCOutside => {
                 v[0] += F::one();
             }
@@ -336,6 +342,13 @@ fn test_naysay() {
     );
 
     /***************** Case 6 *****************/
+    // Merkle path index is manually changed
+    test_naysay_with(
+        LinearCodeDishonesty::MerkleLeafIndex(17),
+        LinearCodeNaysayerProof::PathIndexLie(17),
+    );
+
+    /***************** Case 7 *****************/
     // Claimed evaluation is incorrect
     test_naysay_with(
         LinearCodeDishonesty::Evaluation,
