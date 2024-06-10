@@ -18,9 +18,11 @@ use rayon::prelude::*;
 
 mod data_structures;
 pub use data_structures::*;
+mod naysayer;
 #[cfg(test)]
 mod tests;
 mod utils;
+
 /// String of bytes used to seed the randomness during the setup function.
 /// Note that the latter should never be used in production environments.
 pub const PROTOCOL_NAME: &'static [u8] = b"Hyrax protocol";
