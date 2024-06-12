@@ -17,6 +17,7 @@ type LeafH = LeafIdentityHasher;
 type CompressH = Sha256;
 type ColHasher<F, D> = FieldToBytesColHasher<F, D>;
 
+/// Identity hasher for leaves.
 pub struct LeafIdentityHasher;
 
 impl CRHScheme for LeafIdentityHasher {
@@ -68,6 +69,7 @@ where
     }
 }
 
+/// Test parameters for the Merkle tree.
 pub struct TestMerkleTreeParams;
 
 impl Config for TestMerkleTreeParams {

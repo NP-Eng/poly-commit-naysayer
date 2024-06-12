@@ -11,7 +11,7 @@ use ark_crypto_primitives::{
 };
 use ark_poly::Polynomial;
 use ark_poly_commit::{to_bytes, LabeledCommitment};
-use ark_std::{borrow::Borrow, iter::Iterator, rand::RngCore};
+use ark_std::{borrow::Borrow, rand::RngCore};
 
 use crate::{utils::inner_product, NaysayerError, PCSNaysayer};
 
