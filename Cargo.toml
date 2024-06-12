@@ -1,5 +1,5 @@
 [workspace]
-members = ["poly-commit", "bench-templates"]
+members = ["poly-commit", "bench-templates", "poly-naysayer"]
 resolver = "2"
 
 
