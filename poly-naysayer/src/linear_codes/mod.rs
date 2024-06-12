@@ -1,25 +1,24 @@
 use ark_ff::PrimeField;
 
 use ark_poly_commit::linear_codes::{
-    calculate_t, get_indices_from_sponge, LinCodeParametersInfo,
-    LinearCodePCS, LinearEncode,
+    calculate_t, get_indices_from_sponge, LinCodeParametersInfo, LinearCodePCS, LinearEncode,
 };
 
 use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
 use ark_crypto_primitives::{
     merkle_tree::Config,
     sponge::{Absorb, CryptographicSponge},
-    };
+};
 use ark_poly::Polynomial;
 use ark_poly_commit::{to_bytes, LabeledCommitment};
 use ark_std::{borrow::Borrow, rand::RngCore};
-    
-use crate::{NaysayerError, PCSNaysayer, utils::inner_product};
+
+use crate::{utils::inner_product, NaysayerError, PCSNaysayer};
 
 use ark_std::iter::Iterator;
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 /// Naysayer proof for LinearCodePCS opening, indicating which piece of the
 /// opening proof is incorrect (if any)
@@ -216,7 +215,8 @@ where
                 match naysayer_proof {
                     LinearCodeNaysayerProof::PathIndexLie(j) => {
                         sponge.absorb(
-                            &to_bytes!(&commitment.root).map_err(|_| NaysayerError::TranscriptError)?,
+                            &to_bytes!(&commitment.root)
+                                .map_err(|_| NaysayerError::TranscriptError)?,
                         );
 
                         // 1. Seed the transcript with the point and the recieved vector
@@ -245,7 +245,8 @@ where
                     }
                     LinearCodeNaysayerProof::ColumnInnerProductLie(j) => {
                         sponge.absorb(
-                            &to_bytes!(&commitment.root).map_err(|_| NaysayerError::TranscriptError)?,
+                            &to_bytes!(&commitment.root)
+                                .map_err(|_| NaysayerError::TranscriptError)?,
                         );
 
                         // 1. Seed the transcript with the point and the recieved vector

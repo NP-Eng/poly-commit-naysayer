@@ -1,4 +1,3 @@
-
 #[cfg(feature = "parallel")]
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},

@@ -1,12 +1,24 @@
 use core::borrow::Borrow;
 
-use crate::linear_codes::utils::{calculate_t, get_indices_from_sponge};
-use crate::linear_codes::{
-    create_merkle_tree, LPCPArray, LinCodePCCommitment, LinCodePCCommitmentState, LinCodePCProof,
-    LinCodePCProofSingle, LinCodeParametersInfo, LinearCodePCS, LinearEncode,
+use ark_ff::PrimeField;
+
+use ark_poly_commit::linear_codes::{
+    calculate_t, get_indices_from_sponge, LinCodeParametersInfo, LinearCodePCS, LinearEncode,
 };
-use crate::utils::test_sponge;
-use crate::Error;
+
+use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
+use ark_crypto_primitives::{
+    merkle_tree::Config,
+    sponge::{Absorb, CryptographicSponge},
+};
+use ark_poly::Polynomial;
+use ark_poly_commit::{to_bytes, LabeledCommitment, PolynomialCommitment};
+use ark_std::rand::RngCore;
+
+use crate::{utils::inner_product, NaysayerError, PCSNaysayer};
+
+use ark_poly_commit::utils::test_sponge;
+
 use crate::{
     linear_codes::{LigeroPCParams, MultilinearLigero, PolynomialCommitment},
     LabeledPolynomial,
@@ -56,7 +68,7 @@ type LigeroPCS<F> = LinearCodePCS<
     ColHasher<F, Blake2s256>,
 >;
 
-// Types of dishonesty that can be introduce in a LinearCodePCS proof
+// Types of dishonesty that can be introduced in a LinearCodePCS proof
 #[derive(Eq, PartialEq)]
 enum LinearCodeDishonesty {
     // No dishonesty: same as the open
@@ -93,69 +105,6 @@ where
     C::Leaf: Sized + Clone + Default + Send + AsRef<C::Leaf>,
     H: CRHScheme + 'static,
 {
-    // Convenience function that generates a possibly dishonest LinearCodePCS
-    // proof based on the `dishonesty` argument, checks that
-    // LinearCodePCS::check outputs the expected result (typically rejection)
-    // and also verifies that naysay detects the planted dishonesty and
-    // naysay_verify accepts the naysayer proof
-    fn test_naysay_aux(
-        ck: &L::LinCodePCParams,
-        vk: &L::LinCodePCParams,
-        com: &LabeledCommitment<LinCodePCCommitment<C>>,
-        com_state: &LinCodePCCommitmentState<F, H>,
-        point: &P::Point,
-        value: F,
-        sponge: &mut impl CryptographicSponge,
-        dishonesty: LinearCodeDishonesty,
-        expected_naysayer_proof: LinearCodeNaysayerProof,
-    ) {
-        let value = if dishonesty == LinearCodeDishonesty::Evaluation {
-            value + F::one()
-        } else {
-            value
-        };
-
-        // Generating possibly dishonest proof
-        let proof =
-            Self::dishonest_open(ck, com, com_state, point, &mut sponge.clone(), dishonesty)
-                .unwrap();
-
-        // TODO This cumbersome block is due to the current inconsistent
-        // behaviour of LinearCodePCS::check, which can return Err when
-        // there is a genuine runtime error during verification OR when no
-        // runtime errors occur but the proof is rejected; and, in the
-        // latter case, sometimes Ok(false) is returned instead. The block
-        // below can be made cleaner once open is made consistent.
-        let result = Self::check(vk, [com], point, [value], &proof, &mut sponge.clone(), None);
-        if expected_naysayer_proof == LinearCodeNaysayerProof::Aye {
-            assert!(result.unwrap());
-        } else {
-            assert!(result.is_err() || !result.unwrap());
-        }
-
-        // Produce a naysayer proof from the given PCS proof
-        let naysayer_proof =
-            Self::naysay(vk, [com], point, [value], &proof, &mut sponge.clone(), None).unwrap();
-
-        assert_eq!(naysayer_proof, expected_naysayer_proof);
-
-        // Verify the naysayer proof
-        assert_eq!(
-            expected_naysayer_proof == LinearCodeNaysayerProof::Aye,
-            !Self::naysayer_verify(
-                vk,
-                [com],
-                point,
-                [value],
-                &proof,
-                naysayer_proof,
-                &mut sponge.clone(),
-                None
-            )
-            .unwrap()
-        );
-    }
-
     // Generates a LinearCodePCS proof introducing a dishonesty
     fn dishonest_open(
         ck: &L::LinCodePCParams,
@@ -354,22 +303,4 @@ fn test_naysay() {
         LinearCodeDishonesty::Evaluation,
         LinearCodeNaysayerProof::EvaluationLie,
     );
-}
-
-fn rand_point<F: Field>(num_vars: Option<usize>, rng: &mut ChaCha20Rng) -> Vec<F> {
-    match num_vars {
-        Some(n) => (0..n).map(|_| F::rand(rng)).collect(),
-        None => unimplemented!(), // should not happen!
-    }
-}
-
-fn rand_poly<Fr: PrimeField>(
-    _: usize,
-    num_vars: Option<usize>,
-    rng: &mut ChaCha20Rng,
-) -> SparseMultilinearExtension<Fr> {
-    match num_vars {
-        Some(n) => SparseMultilinearExtension::rand(n, rng),
-        None => unimplemented!(), // should not happen in ML case!
-    }
 }

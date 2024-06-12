@@ -5,8 +5,13 @@ use ark_ff::PrimeField;
 use ark_poly::Polynomial;
 use ark_poly_commit::{LabeledCommitment, PolynomialCommitment};
 
+use ark_std::fmt::Debug;
+
 mod linear_codes;
 mod utils;
+
+#[cfg(test)]
+mod tests;
 
 type NaysayerError = ark_poly_commit::Error;
 
@@ -15,7 +20,7 @@ where
     F: PrimeField,
     P: Polynomial<F>,
 {
-    type NaysayerProof;
+    type NaysayerProof: Eq + Debug;
 
     fn naysay<'a>(
         vk: &Self::VerifierKey,
@@ -25,7 +30,7 @@ where
         proof: &Self::Proof,
         sponge: &mut impl CryptographicSponge,
         rng: Option<&mut dyn RngCore>,
-    ) -> Result<Self::NaysayerProof, NaysayerError>
+    ) -> Result<Option<Self::NaysayerProof>, NaysayerError>
     where
         Self::Commitment: 'a;
 

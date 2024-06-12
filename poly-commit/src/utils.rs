@@ -60,6 +60,7 @@ pub(crate) fn vector_sum<F: Field>(v1: &[F], v2: &[F]) -> Vec<F> {
 
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
+/// Represents a matrix of field elements.
 pub struct Matrix<F: Field> {
     pub(crate) n: usize,
     pub(crate) m: usize,
@@ -181,7 +182,7 @@ use ark_crypto_primitives::sponge::poseidon::PoseidonSponge;
 use ark_ff::PrimeField;
 
 #[cfg(test)]
-pub(crate) fn test_sponge<F: PrimeField>() -> PoseidonSponge<F> {
+pub fn test_sponge<F: PrimeField>() -> PoseidonSponge<F> {
     use ark_crypto_primitives::sponge::{poseidon::PoseidonConfig, CryptographicSponge};
     use ark_std::test_rng;
 
