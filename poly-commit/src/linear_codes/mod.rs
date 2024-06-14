@@ -23,24 +23,24 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 
 mod utils;
 
-mod multilinear_brakedown;
-mod multilinear_ligero;
-mod univariate_ligero;
-
 pub use multilinear_brakedown::MultilinearBrakedown;
 pub use multilinear_ligero::MultilinearLigero;
 pub use univariate_ligero::UnivariateLigero;
 
+pub use data_structures::{
+    BrakedownPCParams, LPCPArray, LigeroPCParams, LinCodePCCommitment, LinCodePCCommitmentState,
+    LinCodePCProof, LinCodePCProofSingle,
+};
+pub use utils::{calculate_t, get_indices_from_sponge};
+
+use data_structures::*;
+
 mod brakedown;
 mod data_structures;
 mod ligero;
-
-pub use data_structures::BrakedownPCParams;
-use data_structures::*;
-
-pub use data_structures::LinCodePCProof;
-
-pub use utils::{calculate_t, get_indices_from_sponge};
+mod multilinear_brakedown;
+mod multilinear_ligero;
+mod univariate_ligero;
 
 const FIELD_SIZE_ERROR: &str = "This field is not suitable for the proposed parameters";
 
@@ -493,8 +493,9 @@ where
     }
 }
 
+/// Create a Merkle tree from the given leaves
 // TODO maybe this can go to utils
-fn create_merkle_tree<C>(
+pub fn create_merkle_tree<C>(
     leaves: &mut Vec<C::Leaf>,
     leaf_hash_param: &<<C as Config>::LeafHash as CRHScheme>::Parameters,
     two_to_one_hash_param: &<<C as Config>::TwoToOneHash as TwoToOneCRHScheme>::Parameters,

@@ -1,38 +1,15 @@
 use core::borrow::Borrow;
 
-use ark_ff::PrimeField;
-
-use ark_poly_commit::linear_codes::{
-    calculate_t, get_indices_from_sponge, LinCodeParametersInfo, LinearCodePCS, LinearEncode,
-};
-
-use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
-use ark_crypto_primitives::{
-    merkle_tree::Config,
-    sponge::{Absorb, CryptographicSponge},
-};
-use ark_poly::Polynomial;
-use ark_poly_commit::{to_bytes, LabeledCommitment, PolynomialCommitment};
-use ark_std::rand::RngCore;
-
-use crate::{utils::inner_product, NaysayerError, PCSNaysayer};
-
-use ark_poly_commit::utils::test_sponge;
-
-use crate::{
-    linear_codes::{LigeroPCParams, MultilinearLigero, PolynomialCommitment},
-    LabeledPolynomial,
-};
-use crate::{to_bytes, LabeledCommitment};
-use ark_bls12_377::Fr;
-use ark_crypto_primitives::sponge::{Absorb, CryptographicSponge};
 use ark_crypto_primitives::{
     crh::{sha256::Sha256, CRHScheme, TwoToOneCRHScheme},
     merkle_tree::{ByteDigestConverter, Config},
+    sponge::{Absorb, CryptographicSponge},
 };
-use ark_ff::{Field, PrimeField};
-use ark_poly::evaluations::multivariate::{MultilinearExtension, SparseMultilinearExtension};
 use ark_poly::Polynomial;
+
+use ark_bls12_377::Fr;
+use ark_ff::{Field, PrimeField};
+use ark_poly::evaluations::multivariate::SparseMultilinearExtension;
 use ark_std::test_rng;
 use blake2::Blake2s256;
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
@@ -40,6 +17,21 @@ use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use ark_pcs_bench_templates::{FieldToBytesColHasher, LeafIdentityHasher};
 
 use super::LinearCodeNaysayerProof;
+
+use ark_poly_commit::{
+    linear_codes::{
+        calculate_t, create_merkle_tree, get_indices_from_sponge, LPCPArray, LigeroPCParams,
+        LinCodePCCommitment, LinCodePCCommitmentState, LinCodePCProof, LinCodePCProofSingle,
+        LinCodeParametersInfo, LinearCodePCS, LinearEncode, MultilinearLigero,
+    },
+    to_bytes, LabeledCommitment, LabeledPolynomial, PolynomialCommitment,
+};
+
+use crate::{
+    tests::{rand_point, rand_poly, test_naysay_aux},
+    utils::test_sponge,
+    NaysayerError,
+};
 
 type LeafH = LeafIdentityHasher;
 type CompressH = Sha256;
@@ -69,7 +61,7 @@ type LigeroPCS<F> = LinearCodePCS<
 >;
 
 // Types of dishonesty that can be introduced in a LinearCodePCS proof
-#[derive(Eq, PartialEq)]
+#[derive(Clone, PartialEq)]
 enum LinearCodeDishonesty {
     // No dishonesty: same as the open
     None,
@@ -93,8 +85,15 @@ enum LinearCodeDishonesty {
     Evaluation,
 }
 
-// Auxiliary functions for testying naysayer functionality
-impl<L, F, P, C, H> LinearCodePCS<L, F, P, C, H>
+// Generates a LinearCodePCS proof introducing a dishonesty
+fn dishonest_open_lcpcs<L, F, P, C, H>(
+    ck: &L::LinCodePCParams,
+    com: &LabeledCommitment<LinCodePCCommitment<C>>,
+    com_state: &LinCodePCCommitmentState<F, H>,
+    point: &P::Point,
+    sponge: &mut impl CryptographicSponge,
+    dishonesty: LinearCodeDishonesty,
+) -> Result<LPCPArray<F, C>, NaysayerError>
 where
     L: LinearEncode<F, C, P, H>,
     F: PrimeField + Absorb,
@@ -105,99 +104,88 @@ where
     C::Leaf: Sized + Clone + Default + Send + AsRef<C::Leaf>,
     H: CRHScheme + 'static,
 {
-    // Generates a LinearCodePCS proof introducing a dishonesty
-    fn dishonest_open(
-        ck: &L::LinCodePCParams,
-        com: &LabeledCommitment<LinCodePCCommitment<C>>,
-        com_state: &LinCodePCCommitmentState<F, H>,
-        point: &P::Point,
-        sponge: &mut impl CryptographicSponge,
-        dishonesty: LinearCodeDishonesty,
-    ) -> Result<LPCPArray<F, C>, Error> {
-        let commitment = com.commitment();
-        let n_rows = commitment.metadata.n_rows;
-        let n_cols = commitment.metadata.n_cols;
+    let commitment = com.commitment();
+    let n_rows = commitment.metadata.n_rows;
+    let n_cols = commitment.metadata.n_cols;
 
-        // 1. Arrange the coefficients of the polynomial into a matrix,
-        // and apply encoding to get `ext_mat`.
-        // 2. Create the Merkle tree from the hashes of each column.
-        let LinCodePCCommitmentState {
-            mat,
-            ext_mat,
-            leaves: col_hashes,
-        } = com_state;
-        let mut col_hashes: Vec<C::Leaf> =
-            col_hashes.clone().into_iter().map(|h| h.into()).collect(); // TODO cfg_inter
+    // 1. Arrange the coefficients of the polynomial into a matrix,
+    // and apply encoding to get `ext_mat`.
+    // 2. Create the Merkle tree from the hashes of each column.
+    let LinCodePCCommitmentState {
+        mat,
+        ext_mat,
+        leaves: col_hashes,
+    } = com_state;
+    let mut col_hashes: Vec<C::Leaf> = col_hashes.clone().into_iter().map(|h| h.into()).collect(); // TODO cfg_inter
 
-        let col_tree = create_merkle_tree::<C>(
-            &mut col_hashes,
-            ck.leaf_hash_param(),
-            ck.two_to_one_hash_param(),
-        )?;
+    let col_tree = create_merkle_tree::<C>(
+        &mut col_hashes,
+        ck.leaf_hash_param(),
+        ck.two_to_one_hash_param(),
+    )?;
 
-        // 3. Generate vector `b` to left-multiply the matrix.
-        let (_, b) = L::tensor(point, n_cols, n_rows);
+    // 3. Generate vector `b` to left-multiply the matrix.
+    let (_, b) = L::tensor(point, n_cols, n_rows);
 
-        sponge.absorb(&to_bytes!(&commitment.root).map_err(|_| Error::TranscriptError)?);
+    sponge.absorb(&to_bytes!(&commitment.root).map_err(|_| NaysayerError::TranscriptError)?);
 
-        let point_vec = L::point_to_vec(point.clone());
-        sponge.absorb(&point_vec);
+    let point_vec = L::point_to_vec(point.clone());
+    sponge.absorb(&point_vec);
 
-        // left-multiply the matrix by `b` - possibly dishonestly
-        let mut v = mat.row_mul(&b);
+    // left-multiply the matrix by `b` - possibly dishonestly
+    let mut v = mat.row_mul(&b);
 
-        if dishonesty == LinearCodeDishonesty::RowLCInside {
+    if dishonesty == LinearCodeDishonesty::RowLCInside {
+        v[0] += F::one();
+    }
+
+    sponge.absorb(&v);
+
+    // computing the number of queried columns
+    let t = calculate_t::<F>(ck.sec_param(), ck.distance(), ext_mat.m)?;
+
+    let indices = get_indices_from_sponge(ext_mat.m, t, sponge)?;
+
+    let mut queried_columns = Vec::with_capacity(t);
+    let mut paths = Vec::with_capacity(t);
+
+    let ext_mat_cols = ext_mat.cols();
+
+    for i in indices {
+        queried_columns.push(ext_mat_cols[i].clone());
+        paths.push(
+            col_tree
+                .generate_proof(i)
+                .map_err(|_| NaysayerError::TranscriptError)?,
+        );
+    }
+
+    match dishonesty {
+        LinearCodeDishonesty::Column => {
+            queried_columns[0][0] = F::one();
+        }
+        LinearCodeDishonesty::MerklePath => {
+            paths[0].auth_path[0] = paths[0].auth_path[1].clone();
+        }
+        LinearCodeDishonesty::MerkleLeafIndex(j) => {
+            paths[j].leaf_index += 1;
+        }
+        LinearCodeDishonesty::RowLCOutside => {
             v[0] += F::one();
         }
+        _ => {}
+    };
 
-        sponge.absorb(&v);
+    let opening = LinCodePCProofSingle {
+        paths,
+        v,
+        columns: queried_columns,
+    };
 
-        // computing the number of queried columns
-        let t = calculate_t::<F>(ck.sec_param(), ck.distance(), ext_mat.m)?;
-
-        let indices = get_indices_from_sponge(ext_mat.m, t, sponge)?;
-
-        let mut queried_columns = Vec::with_capacity(t);
-        let mut paths = Vec::with_capacity(t);
-
-        let ext_mat_cols = ext_mat.cols();
-
-        for i in indices {
-            queried_columns.push(ext_mat_cols[i].clone());
-            paths.push(
-                col_tree
-                    .generate_proof(i)
-                    .map_err(|_| Error::TranscriptError)?,
-            );
-        }
-
-        match dishonesty {
-            LinearCodeDishonesty::Column => {
-                queried_columns[0][0] = F::one();
-            }
-            LinearCodeDishonesty::MerklePath => {
-                paths[0].auth_path[0] = paths[0].auth_path[1].clone();
-            }
-            LinearCodeDishonesty::MerkleLeafIndex(j) => {
-                paths[j].leaf_index += 1;
-            }
-            LinearCodeDishonesty::RowLCOutside => {
-                v[0] += F::one();
-            }
-            _ => {}
-        };
-
-        let opening = LinCodePCProofSingle {
-            paths,
-            v,
-            columns: queried_columns,
-        };
-
-        Ok(vec![LinCodePCProof {
-            opening,
-            well_formedness: None,
-        }])
-    }
+    Ok(vec![LinCodePCProof {
+        opening,
+        well_formedness: None,
+    }])
 }
 
 #[test]
@@ -235,7 +223,7 @@ fn test_naysay() {
     );
 
     let test_sponge = test_sponge::<Fr>();
-    let (c, rands) = LigeroPCS::<Fr>::commit(&ck, &[labeled_poly.clone()], None).unwrap();
+    let (com, com_state) = LigeroPCS::<Fr>::commit(&ck, &[labeled_poly.clone()], None).unwrap();
 
     let point = rand_point(Some(num_vars), rand_chacha);
 
@@ -244,28 +232,47 @@ fn test_naysay() {
     // The only arguments to test_naysay_aux we intend to change are the
     // dishonesty and the expected type of naysayer proof returned
     let test_naysay_with = |dishonesty, expected_naysayer_proof| {
-        LigeroPCS::<Fr>::test_naysay_aux(
+        let new_value = if dishonesty != LinearCodeDishonesty::Evaluation {
+            value
+        } else {
+            value + Fr::ONE
+        };
+
+        let proof = dishonest_open_lcpcs::<
+            MultilinearLigero<_, _, SparseMultilinearExtension<Fr>, _>,
+            _,
+            _,
+            _,
+            _,
+        >(
             &ck,
-            &vk,
-            &c[0],
-            &rands[0],
+            &com[0],
+            &com_state[0],
             &point,
-            value,
             &mut test_sponge.clone(),
             dishonesty,
+        );
+
+        test_naysay_aux::<Fr, SparseMultilinearExtension<Fr>, LigeroPCS<Fr>>(
+            &vk,
+            &com[0],
+            &point,
+            new_value,
+            &mut test_sponge.clone(),
+            proof.unwrap(),
             expected_naysayer_proof,
         );
     };
 
     /***************** Case 1 *****************/
     // Honest proof verifies and is not naysaid
-    test_naysay_with(LinearCodeDishonesty::None, LinearCodeNaysayerProof::Aye);
+    test_naysay_with(LinearCodeDishonesty::None, None);
 
     /***************** Case 2 *****************/
     // Sponge produces different column indices than those in the proof
     test_naysay_with(
         LinearCodeDishonesty::RowLCOutside,
-        LinearCodeNaysayerProof::PathIndexLie(0),
+        Some(LinearCodeNaysayerProof::PathIndexLie(0)),
     );
 
     /***************** Case 3 *****************/
@@ -273,34 +280,34 @@ fn test_naysay() {
     // inconsistent sponge
     test_naysay_with(
         LinearCodeDishonesty::RowLCInside,
-        LinearCodeNaysayerProof::ColumnInnerProductLie(0),
+        Some(LinearCodeNaysayerProof::ColumnInnerProductLie(0)),
     );
 
     /***************** Case 4 *****************/
     // Column index is correct, but column values are not
     test_naysay_with(
         LinearCodeDishonesty::Column,
-        LinearCodeNaysayerProof::MerklePathLie(0),
+        Some(LinearCodeNaysayerProof::MerklePathLie(0)),
     );
 
     /***************** Case 5 *****************/
     // Merkle path proof is tampered with
     test_naysay_with(
         LinearCodeDishonesty::MerklePath,
-        LinearCodeNaysayerProof::MerklePathLie(0),
+        Some(LinearCodeNaysayerProof::MerklePathLie(0)),
     );
 
     /***************** Case 6 *****************/
     // Merkle path index is manually changed
     test_naysay_with(
         LinearCodeDishonesty::MerkleLeafIndex(17),
-        LinearCodeNaysayerProof::PathIndexLie(17),
+        Some(LinearCodeNaysayerProof::PathIndexLie(17)),
     );
 
     /***************** Case 7 *****************/
     // Claimed evaluation is incorrect
     test_naysay_with(
         LinearCodeDishonesty::Evaluation,
-        LinearCodeNaysayerProof::EvaluationLie,
+        Some(LinearCodeNaysayerProof::EvaluationLie),
     );
 }

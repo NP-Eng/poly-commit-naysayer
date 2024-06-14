@@ -202,7 +202,6 @@ where
         let t = calculate_t::<F>(vk.sec_param(), vk.distance(), n_ext_cols)?;
 
         match naysayer_proof {
-            LinearCodeNaysayerProof::Aye => Ok(false),
             LinearCodeNaysayerProof::PathIndexLie(j)
             | LinearCodeNaysayerProof::MerklePathLie(j)
             | LinearCodeNaysayerProof::ColumnInnerProductLie(j) => {

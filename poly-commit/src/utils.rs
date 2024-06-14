@@ -62,8 +62,10 @@ pub(crate) fn vector_sum<F: Field>(v1: &[F], v2: &[F]) -> Vec<F> {
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
 /// Represents a matrix of field elements.
 pub struct Matrix<F: Field> {
-    pub(crate) n: usize,
-    pub(crate) m: usize,
+    /// Number of rows, each of length m
+    pub n: usize,
+    /// Number of columns, each of length n
+    pub m: usize,
     entries: Vec<Vec<F>>,
 }
 
@@ -124,12 +126,12 @@ impl<F: Field> Matrix<F> {
     }
 
     /// Returns self as a list of rows
-    pub(crate) fn rows(&self) -> Vec<Vec<F>> {
+    pub fn rows(&self) -> Vec<Vec<F>> {
         self.entries.clone()
     }
 
     /// Returns self as a list of columns
-    pub(crate) fn cols(&self) -> Vec<Vec<F>> {
+    pub fn cols(&self) -> Vec<Vec<F>> {
         (0..self.m)
             .map(|col| (0..self.n).map(|row| self.entries[row][col]).collect())
             .collect()
@@ -139,7 +141,7 @@ impl<F: Field> Matrix<F> {
     /// it returns a linear combination of the rows of self with coefficients given by v.
     ///
     /// Panics if the length of v is different from the number of rows of self.
-    pub(crate) fn row_mul(&self, v: &[F]) -> Vec<F> {
+    pub fn row_mul(&self, v: &[F]) -> Vec<F> {
         assert_eq!(
             v.len(),
             self.n,
