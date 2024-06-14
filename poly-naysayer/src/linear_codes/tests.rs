@@ -16,7 +16,7 @@ use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 
 use ark_pcs_bench_templates::{FieldToBytesColHasher, LeafIdentityHasher};
 
-use super::LinearCodeNaysayerProof;
+use super::{LinearCodeNaysayerProof, LinearCodeNaysayerProofSingle};
 
 use ark_poly_commit::{
     linear_codes::{
@@ -223,7 +223,7 @@ fn test_naysay() {
     );
 
     let test_sponge = test_sponge::<Fr>();
-    let (com, com_state) = LigeroPCS::<Fr>::commit(&ck, &[labeled_poly.clone()], None).unwrap();
+    let (coms, com_states) = LigeroPCS::<Fr>::commit(&ck, &[labeled_poly.clone()], None).unwrap();
 
     let point = rand_point(Some(num_vars), rand_chacha);
 
@@ -246,8 +246,8 @@ fn test_naysay() {
             _,
         >(
             &ck,
-            &com[0],
-            &com_state[0],
+            &coms[0],
+            &com_states[0],
             &point,
             &mut test_sponge.clone(),
             dishonesty,
@@ -255,9 +255,9 @@ fn test_naysay() {
 
         test_naysay_aux::<Fr, SparseMultilinearExtension<Fr>, LigeroPCS<Fr>>(
             &vk,
-            &com[0],
+            &coms,
             &point,
-            new_value,
+            [new_value],
             &mut test_sponge.clone(),
             proof.unwrap(),
             expected_naysayer_proof,
@@ -272,7 +272,10 @@ fn test_naysay() {
     // Sponge produces different column indices than those in the proof
     test_naysay_with(
         LinearCodeDishonesty::RowLCOutside,
-        Some(LinearCodeNaysayerProof::PathIndexLie(0)),
+        Some(LinearCodeNaysayerProof {
+            incorrect_proof_index: 0,
+            naysayer_proof_single: super::LinearCodeNaysayerProofSingle::PathIndexLie(0),
+        }),
     );
 
     /***************** Case 3 *****************/
@@ -280,34 +283,49 @@ fn test_naysay() {
     // inconsistent sponge
     test_naysay_with(
         LinearCodeDishonesty::RowLCInside,
-        Some(LinearCodeNaysayerProof::ColumnInnerProductLie(0)),
+        Some(LinearCodeNaysayerProof {
+            incorrect_proof_index: 0,
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::ColumnInnerProductLie(0),
+        }),
     );
 
     /***************** Case 4 *****************/
     // Column index is correct, but column values are not
     test_naysay_with(
         LinearCodeDishonesty::Column,
-        Some(LinearCodeNaysayerProof::MerklePathLie(0)),
+        Some(LinearCodeNaysayerProof {
+            incorrect_proof_index: 0,
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathLie(0),
+        }),
     );
 
     /***************** Case 5 *****************/
     // Merkle path proof is tampered with
     test_naysay_with(
         LinearCodeDishonesty::MerklePath,
-        Some(LinearCodeNaysayerProof::MerklePathLie(0)),
+        Some(LinearCodeNaysayerProof {
+            incorrect_proof_index: 0,
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathLie(0),
+        }),
     );
 
     /***************** Case 6 *****************/
     // Merkle path index is manually changed
     test_naysay_with(
         LinearCodeDishonesty::MerkleLeafIndex(17),
-        Some(LinearCodeNaysayerProof::PathIndexLie(17)),
+        Some(LinearCodeNaysayerProof {
+            incorrect_proof_index: 0,
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::PathIndexLie(17),
+        }),
     );
 
     /***************** Case 7 *****************/
     // Claimed evaluation is incorrect
     test_naysay_with(
         LinearCodeDishonesty::Evaluation,
-        Some(LinearCodeNaysayerProof::EvaluationLie),
+        Some(LinearCodeNaysayerProof {
+            incorrect_proof_index: 0,
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::EvaluationLie,
+        }),
     );
 }

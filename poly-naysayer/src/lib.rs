@@ -15,6 +15,7 @@ mod tests;
 
 type NaysayerError = ark_poly_commit::Error;
 
+/// Naysayer interface for polynomial commitment schemes
 pub trait PCSNaysayer<F, P>: PolynomialCommitment<F, P>
 where
     F: PrimeField,
@@ -22,6 +23,10 @@ where
 {
     type NaysayerProof: PartialEq + Debug;
 
+    /// Naysays the given proof, returning
+    /// - Err(e) if non-assertion error e was encountered
+    /// - Ok(None) if no errors were encountered and the proof is valid ("aye")
+    /// - Ok(Some(naysayer_proof)) if an assertion error was encountered
     fn naysay<'a>(
         vk: &Self::VerifierKey,
         commitments: impl IntoIterator<Item = &'a LabeledCommitment<Self::Commitment>>,
@@ -34,6 +39,15 @@ where
     where
         Self::Commitment: 'a;
 
+    /// Verifies the naysayer proof. Returns:
+    /// - Ok(true) if the original proof is rejected (i.e. the naysayer proof
+    ///   points to a valid issue).
+    /// - Ok(false) if the original proof is accepted, i.e.
+    ///     - either the naysayer proof told to accept the original proof
+    ///       ("Aye")
+    ///     - or the naysayer proof points to an invalid issue
+    /// - Err if another type of error occurs during verification of the
+    ///   naysayer proof.
     fn verify_naysay<'a>(
         vk: &Self::VerifierKey,
         commitments: impl IntoIterator<Item = &'a LabeledCommitment<Self::Commitment>>,
