@@ -24,8 +24,6 @@ mod tests;
 /// opening proof is incorrect (if any)
 #[derive(PartialEq, Debug)]
 pub enum LinearCodeNaysayerProof {
-    /// No errors, opening proof accepted
-    Aye,
     /// Mismatch between the index of the Merkle path provided and the challenge
     /// index squeezed from the sponge
     PathIndexLie(usize),
@@ -62,7 +60,7 @@ where
         proof: &Self::Proof,
         sponge: &mut impl CryptographicSponge,
         _rng: Option<&mut dyn RngCore>,
-    ) -> Result<Self::NaysayerProof, NaysayerError> {
+    ) -> Result<Option<Self::NaysayerProof>, NaysayerError> {
         assert!(
             !vk.check_well_formedness(),
             "naysay is only implemented without the well-formedness check",
@@ -126,14 +124,14 @@ where
         for (j, (leaf, q_j)) in col_hashes.iter().zip(indices.iter()).enumerate() {
             let path = &proof.opening.paths[j];
             if path.leaf_index != *q_j {
-                return Ok(LinearCodeNaysayerProof::PathIndexLie(j));
+                return Ok(Some(LinearCodeNaysayerProof::PathIndexLie(j)));
             }
 
             if !path
                 .verify(leaf_hash_param, two_to_one_hash_param, root, leaf.clone())
                 .map_err(|_| NaysayerError::HashingError)?
             {
-                return Ok(LinearCodeNaysayerProof::MerklePathLie(j));
+                return Ok(Some(LinearCodeNaysayerProof::MerklePathLie(j)));
             }
         }
 
@@ -148,17 +146,17 @@ where
         // Note: we sacrifice some code repetition in order not to repeat execution.
         for (transcript_index, matrix_index) in indices.iter().enumerate() {
             if inner_product(&b, &proof.opening.columns[transcript_index]) != w[*matrix_index] {
-                return Ok(LinearCodeNaysayerProof::ColumnInnerProductLie(
+                return Ok(Some(LinearCodeNaysayerProof::ColumnInnerProductLie(
                     transcript_index,
-                ));
+                )));
             }
         }
 
         if inner_product(&proof.opening.v, &a) != value {
-            return Ok(LinearCodeNaysayerProof::EvaluationLie);
+            return Ok(Some(LinearCodeNaysayerProof::EvaluationLie));
         }
 
-        Ok(LinearCodeNaysayerProof::Aye)
+        Ok(None)
     }
 
     /// Verifies the naysayer proof.

@@ -20,7 +20,7 @@ where
     F: PrimeField,
     P: Polynomial<F>,
 {
-    type NaysayerProof: Eq + Debug;
+    type NaysayerProof: PartialEq + Debug;
 
     fn naysay<'a>(
         vk: &Self::VerifierKey,
