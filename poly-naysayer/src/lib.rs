@@ -1,11 +1,11 @@
-use ark_std::rand::RngCore;
+#![cfg_attr(not(feature = "std"), no_std)]
 
 use ark_crypto_primitives::sponge::CryptographicSponge;
 use ark_ff::PrimeField;
 use ark_poly::Polynomial;
 use ark_poly_commit::{LabeledCommitment, PolynomialCommitment};
 
-use ark_std::fmt::Debug;
+use ark_std::{fmt::Debug, rand::RngCore};
 
 mod linear_codes;
 mod utils;
