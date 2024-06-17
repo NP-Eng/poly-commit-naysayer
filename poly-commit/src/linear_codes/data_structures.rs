@@ -114,9 +114,9 @@ impl<C: Config> PCCommitment for LinCodePCCommitment<C> {
     }
 }
 
-/// Opening hint for a linear-code PCS commitment. Does not contain strictly
-/// necessary information for opening, but rather auxiliary information that
-/// saves time while opening (by avoiding recomputation)
+/// Opening hint for a linear-code PCS commitment. 
+/// Contains auxiliary information, not strictly necessary for the opening.
+/// Rather, it helps to avoid repeating work already done at `commit`.
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
 pub struct LinCodePCCommitmentState<F, H>
