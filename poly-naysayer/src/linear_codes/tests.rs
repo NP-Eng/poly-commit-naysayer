@@ -16,7 +16,7 @@ use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 
 use ark_pcs_bench_templates::{FieldToBytesColHasher, LeafIdentityHasher};
 
-use super::{LinearCodeNaysayerProof, LinearCodeNaysayerProofSingle, PCSNaysayer};
+use super::{LinearCodeNaysayerProof, LinearCodeNaysayerProofSingle};
 
 use ark_poly_commit::{
     linear_codes::{
@@ -28,7 +28,7 @@ use ark_poly_commit::{
 };
 
 use crate::{
-    tests::{rand_point, rand_poly, test_naysay_aux},
+    tests::{rand_point, rand_poly, test_invalid_naysayer_proofs, test_naysay_aux},
     utils::test_sponge,
     NaysayerError,
 };
@@ -331,38 +331,32 @@ fn test_naysay() {
 
     /***************** Case 8 *****************/
     // Verifier returns false when the proof is correct
-    let proof = LigeroPCS::<Fr>::open(
+    let possible_naysayer_proofs = vec![
+        LinearCodeNaysayerProofSingle::PathIndexLie(0),
+        LinearCodeNaysayerProofSingle::ColumnInnerProductLie(0),
+        LinearCodeNaysayerProofSingle::MerklePathLie(0),
+        LinearCodeNaysayerProofSingle::EvaluationLie,
+        LinearCodeNaysayerProofSingle::PathIndexLie(100),
+        LinearCodeNaysayerProofSingle::ColumnInnerProductLie(100),
+        LinearCodeNaysayerProofSingle::MerklePathLie(100),
+    ];
+
+    let possible_naysayer_proofs = possible_naysayer_proofs
+        .into_iter()
+        .map(|naysayer_proof_single| LinearCodeNaysayerProof {
+            incorrect_proof_index: 0,
+            naysayer_proof_single,
+        })
+        .collect::<Vec<_>>();
+
+    test_invalid_naysayer_proofs::<Fr, SparseMultilinearExtension<Fr>, LigeroPCS<Fr>>(
+        &vk,
         &ck,
-        [],
+        [&labeled_poly.clone()],
         &coms,
+        &com_states,
         &point,
         &mut test_sponge.clone(),
-        &com_states,
-        None,
-    )
-    .unwrap();
-
-    let assert_invalid_naysayer_proof = |naysayer_proof| {
-        let inner_naysayer_proof = LinearCodeNaysayerProof {
-            incorrect_proof_index: 0,
-            naysayer_proof_single: naysayer_proof,
-        };
-
-        assert!(!LigeroPCS::<Fr>::verify_naysay(
-            &vk,
-            &coms,
-            &point,
-            [value],
-            &proof,
-            &inner_naysayer_proof,
-            &mut test_sponge.clone(),
-            None
-        )
-        .unwrap());
-    };
-
-    assert_invalid_naysayer_proof(LinearCodeNaysayerProofSingle::PathIndexLie(0));
-    assert_invalid_naysayer_proof(LinearCodeNaysayerProofSingle::ColumnInnerProductLie(0));
-    assert_invalid_naysayer_proof(LinearCodeNaysayerProofSingle::MerklePathLie(0));
-    assert_invalid_naysayer_proof(LinearCodeNaysayerProofSingle::EvaluationLie);
+        possible_naysayer_proofs,
+    );
 }
