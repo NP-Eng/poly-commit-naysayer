@@ -43,12 +43,6 @@ pub(crate) fn test_naysay_aux<'a, F, P, PCSN>(
     PCSN: PCSNaysayer<F, P>,
     PCSN::Commitment: 'a,
 {
-    // TODO This cumbersome block is due to the current inconsistent
-    // behaviour of LinearCodePCS::check, which can return Err when
-    // there is a genuine runtime error during verification OR when no
-    // runtime errors occur but the proof is rejected; and, in the
-    // latter case, sometimes Ok(false) is returned instead. The block
-    // below can be made cleaner once open is made consistent.
     let result = PCSN::check(
         vk,
         coms.clone(),
