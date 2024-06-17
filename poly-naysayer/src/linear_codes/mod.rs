@@ -176,15 +176,6 @@ where
         Ok(None)
     }
 
-    /// Verifies the naysayer proof.
-    /// - Returns `Ok(true)` if the original proof is rejected (i.e. the
-    ///   naysayer proof points to a valid issue).
-    /// - Returns `Ok(false)` if the original proof is accepted, i.e.
-    ///     - either the naysayer proof told to accept the original proof
-    ///       ("Aye")
-    ///     - or the naysayer proof points to an invalid issue
-    /// - Returns `Err` if another type of error occurs during verification of
-    ///   the naysayer proof.
     fn verify_naysay<'a>(
         vk: &Self::VerifierKey,
         coms: impl IntoIterator<Item = &'a LabeledCommitment<Self::Commitment>>,
