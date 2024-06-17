@@ -16,7 +16,7 @@ use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 
 use ark_pcs_bench_templates::{FieldToBytesColHasher, LeafIdentityHasher};
 
-use super::{LinearCodeNaysayerProof, LinearCodeNaysayerProofSingle};
+use super::{LinearCodeNaysayerProof, LinearCodeNaysayerProofSingle, PCSNaysayer};
 
 use ark_poly_commit::{
     linear_codes::{
@@ -328,4 +328,41 @@ fn test_naysay() {
             naysayer_proof_single: LinearCodeNaysayerProofSingle::EvaluationLie,
         }),
     );
+
+    /***************** Case 8 *****************/
+    // Verifier returns false when the proof is correct
+    let proof = LigeroPCS::<Fr>::open(
+        &ck,
+        [],
+        &coms,
+        &point,
+        &mut test_sponge.clone(),
+        &com_states,
+        None,
+    )
+    .unwrap();
+
+    let assert_invalid_naysayer_proof = |naysayer_proof| {
+        let inner_naysayer_proof = LinearCodeNaysayerProof {
+            incorrect_proof_index: 0,
+            naysayer_proof_single: naysayer_proof,
+        };
+
+        assert!(!LigeroPCS::<Fr>::verify_naysay(
+            &vk,
+            &coms,
+            &point,
+            [value],
+            &proof,
+            &inner_naysayer_proof,
+            &mut test_sponge.clone(),
+            None
+        )
+        .unwrap());
+    };
+
+    assert_invalid_naysayer_proof(LinearCodeNaysayerProofSingle::PathIndexLie(0));
+    assert_invalid_naysayer_proof(LinearCodeNaysayerProofSingle::ColumnInnerProductLie(0));
+    assert_invalid_naysayer_proof(LinearCodeNaysayerProofSingle::MerklePathLie(0));
+    assert_invalid_naysayer_proof(LinearCodeNaysayerProofSingle::EvaluationLie);
 }
