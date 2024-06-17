@@ -152,7 +152,7 @@ pub fn get_indices_from_sponge<S: CryptographicSponge>(
     Ok(indices)
 }
 
-/// Calculate the necessary number of queries to a Reed-Solomon-encodied word to
+/// Calculate the necessary number of queries to a Reed-Solomon-encoded word to
 /// achieve the desired security level
 #[inline]
 pub fn calculate_t<F: PrimeField>(
