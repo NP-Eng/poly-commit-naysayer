@@ -274,7 +274,7 @@ fn test_naysay() {
         LinearCodeDishonesty::RowLCOutside,
         Some(LinearCodeNaysayerProof {
             incorrect_proof_index: 0,
-            naysayer_proof_single: super::LinearCodeNaysayerProofSingle::PathIndexLie(0),
+            naysayer_proof_single: super::LinearCodeNaysayerProofSingle::PathIndexAssertion(0),
         }),
     );
 
@@ -285,7 +285,7 @@ fn test_naysay() {
         LinearCodeDishonesty::RowLCInside,
         Some(LinearCodeNaysayerProof {
             incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::ColumnInnerProductLie(0),
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(0),
         }),
     );
 
@@ -295,7 +295,7 @@ fn test_naysay() {
         LinearCodeDishonesty::Column,
         Some(LinearCodeNaysayerProof {
             incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathLie(0),
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathAssertion(0),
         }),
     );
 
@@ -305,7 +305,7 @@ fn test_naysay() {
         LinearCodeDishonesty::MerklePath,
         Some(LinearCodeNaysayerProof {
             incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathLie(0),
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathAssertion(0),
         }),
     );
 
@@ -315,7 +315,7 @@ fn test_naysay() {
         LinearCodeDishonesty::MerkleLeafIndex(17),
         Some(LinearCodeNaysayerProof {
             incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::PathIndexLie(17),
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::PathIndexAssertion(17),
         }),
     );
 
@@ -325,20 +325,20 @@ fn test_naysay() {
         LinearCodeDishonesty::Evaluation,
         Some(LinearCodeNaysayerProof {
             incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::EvaluationLie,
+            naysayer_proof_single: LinearCodeNaysayerProofSingle::EvaluationAssertion,
         }),
     );
 
     /***************** Case 8 *****************/
     // Verifier returns false when the proof is correct
     let possible_naysayer_proofs = vec![
-        LinearCodeNaysayerProofSingle::PathIndexLie(0),
-        LinearCodeNaysayerProofSingle::ColumnInnerProductLie(0),
-        LinearCodeNaysayerProofSingle::MerklePathLie(0),
-        LinearCodeNaysayerProofSingle::EvaluationLie,
-        LinearCodeNaysayerProofSingle::PathIndexLie(100),
-        LinearCodeNaysayerProofSingle::ColumnInnerProductLie(100),
-        LinearCodeNaysayerProofSingle::MerklePathLie(100),
+        LinearCodeNaysayerProofSingle::PathIndexAssertion(0),
+        LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(0),
+        LinearCodeNaysayerProofSingle::MerklePathAssertion(0),
+        LinearCodeNaysayerProofSingle::EvaluationAssertion,
+        LinearCodeNaysayerProofSingle::PathIndexAssertion(100),
+        LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(100),
+        LinearCodeNaysayerProofSingle::MerklePathAssertion(100),
     ];
 
     let possible_naysayer_proofs = possible_naysayer_proofs

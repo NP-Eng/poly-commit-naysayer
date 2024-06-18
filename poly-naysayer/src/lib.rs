@@ -24,7 +24,7 @@ where
     type NaysayerProof: PartialEq + Debug;
 
     /// Naysays the given proof, returning
-    /// - Err(e) if non-assertion error e was encountered
+    /// - Err(e) if controlled execution error e was encountered
     /// - Ok(None) if no errors were encountered and the proof is valid ("aye")
     /// - Ok(Some(naysayer_proof)) if an assertion error was encountered
     fn naysay<'a>(

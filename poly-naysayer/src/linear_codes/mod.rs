@@ -27,15 +27,15 @@ mod tests;
 pub enum LinearCodeNaysayerProofSingle {
     /// Mismatch between the index of the Merkle path provided and the challenge
     /// index squeezed from the sponge
-    PathIndexLie(usize),
+    PathIndexAssertion(usize),
     /// Incorrect Merkle path proof
-    MerklePathLie(usize),
+    MerklePathAssertion(usize),
     /// Mismatch between E(vM) and vE(M) at a challenge position
-    ColumnInnerProductLie(usize),
+    ColumnInnerProductAssertion(usize),
     /// Mismatch between claimed evaluation and t1 M t2, where t1 and t2 are the
     /// two halves of the tensor of the point (powers in the UV case, ML
     /// Lagrange basis evaluation in the ML case)
-    EvaluationLie,
+    EvaluationAssertion,
 }
 
 /// Naysayer proof for an LPCPArray proof (which is a vector of LinCodePCProof,
@@ -130,7 +130,7 @@ where
                 if path.leaf_index != *q_j {
                     return Ok(Some(LinearCodeNaysayerProof {
                         incorrect_proof_index: i,
-                        naysayer_proof_single: LinearCodeNaysayerProofSingle::PathIndexLie(j),
+                        naysayer_proof_single: LinearCodeNaysayerProofSingle::PathIndexAssertion(j),
                     }));
                 }
 
@@ -140,7 +140,9 @@ where
                 {
                     return Ok(Some(LinearCodeNaysayerProof {
                         incorrect_proof_index: i,
-                        naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathLie(j),
+                        naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathAssertion(
+                            j,
+                        ),
                     }));
                 }
             }
@@ -158,9 +160,10 @@ where
                 if inner_product(&b, &proof.opening.columns[transcript_index]) != w[*matrix_index] {
                     return Ok(Some(LinearCodeNaysayerProof {
                         incorrect_proof_index: i,
-                        naysayer_proof_single: LinearCodeNaysayerProofSingle::ColumnInnerProductLie(
-                            transcript_index,
-                        ),
+                        naysayer_proof_single:
+                            LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(
+                                transcript_index,
+                            ),
                     }));
                 }
             }
@@ -168,7 +171,7 @@ where
             if inner_product(&proof.opening.v, &a) != value {
                 return Ok(Some(LinearCodeNaysayerProof {
                     incorrect_proof_index: i,
-                    naysayer_proof_single: LinearCodeNaysayerProofSingle::EvaluationLie,
+                    naysayer_proof_single: LinearCodeNaysayerProofSingle::EvaluationAssertion,
                 }));
             }
         }
@@ -211,15 +214,15 @@ where
         let t = calculate_t::<F>(vk.sec_param(), vk.distance(), n_ext_cols)?;
 
         match naysayer_proof_single {
-            LinearCodeNaysayerProofSingle::PathIndexLie(j)
-            | LinearCodeNaysayerProofSingle::MerklePathLie(j)
-            | LinearCodeNaysayerProofSingle::ColumnInnerProductLie(j) => {
+            LinearCodeNaysayerProofSingle::PathIndexAssertion(j)
+            | LinearCodeNaysayerProofSingle::MerklePathAssertion(j)
+            | LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(j) => {
                 if *j >= t {
                     return Ok(false);
                 }
 
                 match naysayer_proof_single {
-                    LinearCodeNaysayerProofSingle::PathIndexLie(j) => {
+                    LinearCodeNaysayerProofSingle::PathIndexAssertion(j) => {
                         sponge.absorb(
                             &to_bytes!(&com.root).map_err(|_| NaysayerError::TranscriptError)?,
                         );
@@ -238,7 +241,7 @@ where
                         let q_j = indices[*j];
                         Ok(path.leaf_index != q_j)
                     }
-                    LinearCodeNaysayerProofSingle::MerklePathLie(j) => {
+                    LinearCodeNaysayerProofSingle::MerklePathAssertion(j) => {
                         let leaf =
                             H::evaluate(vk.col_hash_params(), proof.opening.columns[*j].clone())
                                 .map_err(|_| NaysayerError::HashingError)?;
@@ -248,7 +251,7 @@ where
                             .map_err(|_| NaysayerError::HashingError)?;
                         Ok(!is_path_ok)
                     }
-                    LinearCodeNaysayerProofSingle::ColumnInnerProductLie(j) => {
+                    LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(j) => {
                         sponge.absorb(
                             &to_bytes!(&com.root).map_err(|_| NaysayerError::TranscriptError)?,
                         );
@@ -272,7 +275,7 @@ where
                     _ => unreachable!(),
                 }
             }
-            LinearCodeNaysayerProofSingle::EvaluationLie => {
+            LinearCodeNaysayerProofSingle::EvaluationAssertion => {
                 let (a, _) = L::tensor(point, n_cols, n_rows);
 
                 Ok(inner_product(&proof.opening.v, &a) != value)
