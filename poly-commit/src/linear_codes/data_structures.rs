@@ -86,10 +86,10 @@ pub struct BrakedownPCParams<F: PrimeField, C: Config, H: CRHScheme> {
 
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize, Absorb)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
-pub(crate) struct Metadata {
-    pub(crate) n_rows: usize,
-    pub(crate) n_cols: usize,
-    pub(crate) n_ext_cols: usize,
+pub struct Metadata {
+    pub n_rows: usize,
+    pub n_cols: usize,
+    pub n_ext_cols: usize,
 }
 
 /// The commitment to a polynomial is a root of the merkle tree,
@@ -97,9 +97,11 @@ pub(crate) struct Metadata {
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize, Absorb)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
 pub struct LinCodePCCommitment<C: Config> {
-    // number of rows resp. columns of the square matrix containing the coefficients of the polynomial
-    pub(crate) metadata: Metadata,
-    pub(crate) root: C::InnerDigest,
+    /// Number of rows resp. columns of the square matrix containing the
+    /// coefficients of the polynomial
+    pub metadata: Metadata,
+    /// The root node of the Merkle tree
+    pub root: C::InnerDigest,
 }
 
 impl<C: Config> PCCommitment for LinCodePCCommitment<C> {
@@ -112,6 +114,9 @@ impl<C: Config> PCCommitment for LinCodePCCommitment<C> {
     }
 }
 
+/// Opening hint for a linear-code PCS commitment.
+/// Contains auxiliary information, not strictly necessary for the opening.
+/// Rather, it helps to avoid repeating work already done at `commit`.
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
 pub struct LinCodePCCommitmentState<F, H>
@@ -119,9 +124,12 @@ where
     F: PrimeField,
     H: CRHScheme,
 {
-    pub(crate) mat: Matrix<F>,
-    pub(crate) ext_mat: Matrix<F>,
-    pub(crate) leaves: Vec<H::Output>,
+    /// The matrix of coefficients of the polynomial
+    pub mat: Matrix<F>,
+    /// Encoded matrix E(mat)
+    pub ext_mat: Matrix<F>,
+    /// Hashes of the columns of the encoded matrix
+    pub leaves: Vec<H::Output>,
 }
 
 impl<F, H> PCCommitmentState for LinCodePCCommitmentState<F, H>
@@ -147,18 +155,17 @@ where
 /// Proof of an individual linear code well-formedness check or opening
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
-pub(crate) struct LinCodePCProofSingle<F, C>
+pub struct LinCodePCProofSingle<F, C>
 where
     F: PrimeField,
     C: Config,
 {
     /// For each of the indices in q, `paths` contains the path from the root of the merkle tree to the leaf
-    pub(crate) paths: Vec<Path<C>>,
-
+    pub paths: Vec<Path<C>>,
     /// v, s.t. E(v) = w
-    pub(crate) v: Vec<F>,
-
-    pub(crate) columns: Vec<Vec<F>>,
+    pub v: Vec<F>,
+    /// Queried columns of the extended matrix
+    pub columns: Vec<Vec<F>>,
 }
 
 /// The Proof type for linear code PCS, which amounts to an array of individual proofs
@@ -169,9 +176,12 @@ where
     F: PrimeField,
     C: Config,
 {
-    pub(crate) opening: LinCodePCProofSingle<F, C>,
-    pub(crate) well_formedness: Option<Vec<F>>,
+    /// The opening proof
+    pub opening: LinCodePCProofSingle<F, C>,
+    /// Some(r) if there is a well-formedness check (in which case v = rM);
+    /// otherwise None
+    pub well_formedness: Option<Vec<F>>,
 }
 
-// Multiple poly at one point
-pub(crate) type LPCPArray<F, C> = Vec<LinCodePCProof<F, C>>;
+/// Multiple poly at one point
+pub type LPCPArray<F, C> = Vec<LinCodePCProof<F, C>>;
