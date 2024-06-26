@@ -171,7 +171,10 @@ fn test_naysay() {
         .clone();
     let col_hash_params =
         <FieldToBytesColHasher<Fr, Blake2s256> as CRHScheme>::setup(&mut rng).unwrap();
-    let check_well_formedness = true;
+
+    // We assume well-formedness is always false, i.e. that the queried point is
+    // random
+    let check_well_formedness = false;
 
     let pp: LigeroPCParams<Fr, TestMerkleTreeParams, FieldToBytesColHasher<Fr, Blake2s256>> =
         LigeroPCParams::new(
