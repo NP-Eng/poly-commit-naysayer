@@ -2,7 +2,7 @@ use core::borrow::Borrow;
 
 use ark_crypto_primitives::{
     crh::{sha256::Sha256, CRHScheme, TwoToOneCRHScheme},
-    merkle_tree::{ByteDigestConverter, Config},
+    merkle_tree::Config,
     sponge::{Absorb, CryptographicSponge},
 };
 use ark_poly::Polynomial;
@@ -14,51 +14,23 @@ use ark_std::test_rng;
 use blake2::Blake2s256;
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 
-use ark_pcs_bench_templates::{FieldToBytesColHasher, LeafIdentityHasher};
-
 use super::{LinearCodeNaysayerProof, LinearCodeNaysayerProofSingle};
 
 use ark_poly_commit::{
     linear_codes::{
         calculate_t, create_merkle_tree, get_indices_from_sponge, LPCPArray, LigeroPCParams,
         LinCodePCCommitment, LinCodePCCommitmentState, LinCodePCProof, LinCodePCProofSingle,
-        LinCodeParametersInfo, LinearCodePCS, LinearEncode, MultilinearLigero,
+        LinCodeParametersInfo, LinearEncode, MultilinearLigero,
     },
+    test_sponge,
+    test_types::{FieldToBytesColHasher, LeafIdentityHasher, TestMLLigero, TestMerkleTreeParams},
     to_bytes, LabeledCommitment, LabeledPolynomial, PolynomialCommitment,
 };
 
 use crate::{
     tests::{rand_point, rand_poly, test_invalid_naysayer_proofs, test_naysay_aux},
-    utils::test_sponge,
     NaysayerError,
 };
-
-type LeafH = LeafIdentityHasher;
-type CompressH = Sha256;
-type ColHasher<F, D> = FieldToBytesColHasher<F, D>;
-
-struct MerkleTreeParams;
-
-impl Config for MerkleTreeParams {
-    type Leaf = Vec<u8>;
-
-    type LeafDigest = <LeafH as CRHScheme>::Output;
-    type LeafInnerDigestConverter = ByteDigestConverter<Self::LeafDigest>;
-    type InnerDigest = <CompressH as TwoToOneCRHScheme>::Output;
-
-    type LeafHash = LeafH;
-    type TwoToOneHash = CompressH;
-}
-
-type MTConfig = MerkleTreeParams;
-
-type LigeroPCS<F> = LinearCodePCS<
-    MultilinearLigero<F, MTConfig, SparseMultilinearExtension<F>, ColHasher<F, Blake2s256>>,
-    F,
-    SparseMultilinearExtension<F>,
-    MTConfig,
-    ColHasher<F, Blake2s256>,
->;
 
 // Types of dishonesty that can be introduced in a LinearCodePCS proof
 #[derive(Clone, PartialEq)]
@@ -193,26 +165,28 @@ fn test_naysay() {
     let mut rng = &mut test_rng();
     let num_vars = 10;
 
-    let leaf_hash_param = <LeafH as CRHScheme>::setup(&mut rng).unwrap();
-    let two_to_one_hash_param = <CompressH as TwoToOneCRHScheme>::setup(&mut rng)
+    let leaf_hash_param = <LeafIdentityHasher as CRHScheme>::setup(&mut rng).unwrap();
+    let two_to_one_hash_param = <Sha256 as TwoToOneCRHScheme>::setup(&mut rng)
         .unwrap()
         .clone();
-    let col_hash_params = <ColHasher<Fr, Blake2s256> as CRHScheme>::setup(&mut rng).unwrap();
+    let col_hash_params =
+        <FieldToBytesColHasher<Fr, Blake2s256> as CRHScheme>::setup(&mut rng).unwrap();
 
     // We assume well-formedness is always false, i.e. that the queried point is
     // random
     let check_well_formedness = false;
 
-    let pp: LigeroPCParams<Fr, MTConfig, ColHasher<Fr, Blake2s256>> = LigeroPCParams::new(
-        128,
-        4,
-        check_well_formedness,
-        leaf_hash_param,
-        two_to_one_hash_param,
-        col_hash_params,
-    );
+    let pp: LigeroPCParams<Fr, TestMerkleTreeParams, FieldToBytesColHasher<Fr, Blake2s256>> =
+        LigeroPCParams::new(
+            128,
+            4,
+            check_well_formedness,
+            leaf_hash_param,
+            two_to_one_hash_param,
+            col_hash_params,
+        );
 
-    let (ck, vk) = LigeroPCS::<Fr>::trim(&pp, 0, 0, None).unwrap();
+    let (ck, vk) = TestMLLigero::<Fr>::trim(&pp, 0, 0, None).unwrap();
 
     let rand_chacha = &mut ChaCha20Rng::from_rng(test_rng()).unwrap();
     let labeled_poly = LabeledPolynomial::new(
@@ -223,7 +197,8 @@ fn test_naysay() {
     );
 
     let test_sponge = test_sponge::<Fr>();
-    let (coms, com_states) = LigeroPCS::<Fr>::commit(&ck, &[labeled_poly.clone()], None).unwrap();
+    let (coms, com_states) =
+        TestMLLigero::<Fr>::commit(&ck, &[labeled_poly.clone()], None).unwrap();
 
     let point = rand_point(Some(num_vars), rand_chacha);
 
@@ -253,7 +228,7 @@ fn test_naysay() {
             dishonesty,
         );
 
-        test_naysay_aux::<Fr, SparseMultilinearExtension<Fr>, LigeroPCS<Fr>>(
+        test_naysay_aux::<Fr, SparseMultilinearExtension<Fr>, TestMLLigero<Fr>>(
             &vk,
             &coms,
             &point,
@@ -349,7 +324,7 @@ fn test_naysay() {
         })
         .collect::<Vec<_>>();
 
-    test_invalid_naysayer_proofs::<Fr, SparseMultilinearExtension<Fr>, LigeroPCS<Fr>>(
+    test_invalid_naysayer_proofs::<Fr, SparseMultilinearExtension<Fr>, TestMLLigero<Fr>>(
         &vk,
         &ck,
         [&labeled_poly.clone()],

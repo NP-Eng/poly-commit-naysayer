@@ -39,6 +39,13 @@ pub use data_structures::*;
 /// Useful functions
 pub mod utils;
 
+/// Types used for testing polynomial commitment schemes.
+#[cfg(any(test, feature = "test-types"))]
+pub mod test_types;
+
+#[cfg(feature = "test-types")]
+pub use test_types::*;
+
 /// R1CS constraints for polynomial constraints.
 #[cfg(feature = "r1cs")]
 mod constraints;
