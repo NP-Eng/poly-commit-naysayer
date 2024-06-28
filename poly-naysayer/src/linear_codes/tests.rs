@@ -1,7 +1,7 @@
 use core::borrow::Borrow;
 
 use ark_crypto_primitives::{
-    crh::{sha256::Sha256, CRHScheme, TwoToOneCRHScheme},
+    crh::CRHScheme,
     merkle_tree::Config,
     sponge::{Absorb, CryptographicSponge},
 };
@@ -11,19 +11,18 @@ use ark_bls12_377::Fr;
 use ark_ff::{Field, PrimeField};
 use ark_poly::evaluations::multivariate::SparseMultilinearExtension;
 use ark_std::test_rng;
-use blake2::Blake2s256;
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 
 use super::{LinearCodeNaysayerProof, LinearCodeNaysayerProofSingle};
 
 use ark_poly_commit::{
     linear_codes::{
-        calculate_t, create_merkle_tree, get_indices_from_sponge, LPCPArray, LigeroPCParams,
-        LinCodePCCommitment, LinCodePCCommitmentState, LinCodePCProof, LinCodePCProofSingle,
-        LinCodeParametersInfo, LinearEncode, MultilinearLigero,
+        calculate_t, create_merkle_tree, get_indices_from_sponge, LPCPArray, LinCodePCCommitment,
+        LinCodePCCommitmentState, LinCodePCProof, LinCodePCProofSingle, LinCodeParametersInfo,
+        LinearEncode, MultilinearLigero,
     },
     test_sponge,
-    test_types::{FieldToBytesColHasher, LeafIdentityHasher, TestMLLigero, TestMerkleTreeParams},
+    test_types::TestMLLigero,
     to_bytes, LabeledCommitment, LabeledPolynomial, PolynomialCommitment,
 };
 
@@ -162,29 +161,11 @@ where
 
 #[test]
 fn test_naysay() {
-    let mut rng = &mut test_rng();
+    let rng = &mut test_rng();
     let num_vars = 10;
 
-    let leaf_hash_param = <LeafIdentityHasher as CRHScheme>::setup(&mut rng).unwrap();
-    let two_to_one_hash_param = <Sha256 as TwoToOneCRHScheme>::setup(&mut rng)
-        .unwrap()
-        .clone();
-    let col_hash_params =
-        <FieldToBytesColHasher<Fr, Blake2s256> as CRHScheme>::setup(&mut rng).unwrap();
-
-    // We assume well-formedness is always false, i.e. that the queried point is
-    // random
-    let check_well_formedness = false;
-
-    let pp: LigeroPCParams<Fr, TestMerkleTreeParams, FieldToBytesColHasher<Fr, Blake2s256>> =
-        LigeroPCParams::new(
-            128,
-            4,
-            check_well_formedness,
-            leaf_hash_param,
-            two_to_one_hash_param,
-            col_hash_params,
-        );
+    let mut pp = TestMLLigero::<Fr>::setup(1, Some(num_vars), rng).unwrap();
+    pp.set_well_formedness(false);
 
     let (ck, vk) = TestMLLigero::<Fr>::trim(&pp, 0, 0, None).unwrap();
 
