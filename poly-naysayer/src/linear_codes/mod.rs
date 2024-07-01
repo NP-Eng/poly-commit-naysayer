@@ -23,7 +23,7 @@ mod tests;
 
 /// Naysayer proof for a single LinCodePCProof (corresponding to one opening),
 /// indicating which piece of the opening proof is incorrect
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum LinearCodeNaysayerProofSingle {
     /// Mismatch between the index of the Merkle path provided and the challenge
     /// index squeezed from the sponge
@@ -42,10 +42,10 @@ pub enum LinearCodeNaysayerProofSingle {
 /// referring to multiple LinearCodePCS openings), which includes both the index
 /// of the opening proof that is incorrect and the naysayer proof for that
 /// opening
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct LinearCodeNaysayerProof {
-    incorrect_proof_index: usize,
-    naysayer_proof_single: LinearCodeNaysayerProofSingle,
+    pub incorrect_proof_index: usize,
+    pub naysayer_proof_single: LinearCodeNaysayerProofSingle,
 }
 
 impl<L, F, P, C, H> PCSNaysayer<F, P> for LinearCodePCS<L, F, P, C, H>
