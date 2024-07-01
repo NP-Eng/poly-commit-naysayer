@@ -7,7 +7,8 @@ use ark_poly_commit::{LabeledCommitment, PolynomialCommitment};
 
 use ark_std::{fmt::Debug, rand::RngCore};
 
-mod linear_codes;
+pub mod linear_codes;
+
 mod utils;
 
 #[cfg(test)]
