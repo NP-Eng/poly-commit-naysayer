@@ -1,3 +1,5 @@
+use alloc::vec;
+use alloc::vec::Vec;
 use core::borrow::Borrow;
 
 use ark_crypto_primitives::{
@@ -33,7 +35,7 @@ use crate::{
 
 // Types of dishonesty that can be introduced in a LinearCodePCS proof
 #[derive(Clone, PartialEq)]
-enum LinearCodeDishonesty {
+pub enum LinearCodeDishonesty {
     // No dishonesty: same as the open
     None,
     // Modify v = bM after honestly producing a proof, leading to an
@@ -57,7 +59,7 @@ enum LinearCodeDishonesty {
 }
 
 // Generates a LinearCodePCS proof introducing a dishonesty
-fn dishonest_open_lcpcs<L, F, P, C, H>(
+pub fn dishonest_open_lcpcs<L, F, P, C, H>(
     ck: &L::LinCodePCParams,
     com: &LabeledCommitment<LinCodePCCommitment<C>>,
     com_state: &LinCodePCCommitmentState<F, H>,
@@ -159,160 +161,164 @@ where
     }])
 }
 
-#[test]
-fn test_naysay() {
-    let rng = &mut test_rng();
-    let num_vars = 10;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_naysay() {
+        let rng = &mut test_rng();
+        let num_vars = 10;
 
-    let mut pp = TestMLLigero::<Fr>::setup(1, Some(num_vars), rng).unwrap();
-    pp.set_well_formedness(false);
+        let mut pp = TestMLLigero::<Fr>::setup(1, Some(num_vars), rng).unwrap();
+        pp.set_well_formedness(false);
 
-    let (ck, vk) = TestMLLigero::<Fr>::trim(&pp, 0, 0, None).unwrap();
+        let (ck, vk) = TestMLLigero::<Fr>::trim(&pp, 0, 0, None).unwrap();
 
-    let rand_chacha = &mut ChaCha20Rng::from_rng(test_rng()).unwrap();
-    let labeled_poly = LabeledPolynomial::new(
-        "test".to_string(),
-        rand_poly(1, Some(num_vars), rand_chacha),
-        Some(num_vars),
-        Some(num_vars),
-    );
+        let rand_chacha = &mut ChaCha20Rng::from_rng(test_rng()).unwrap();
+        let labeled_poly = LabeledPolynomial::new(
+            "test".to_string(),
+            rand_poly(1, Some(num_vars), rand_chacha),
+            Some(num_vars),
+            Some(num_vars),
+        );
 
-    let test_sponge = test_sponge::<Fr>();
-    let (coms, com_states) =
-        TestMLLigero::<Fr>::commit(&ck, &[labeled_poly.clone()], None).unwrap();
+        let test_sponge = test_sponge::<Fr>();
+        let (coms, com_states) =
+            TestMLLigero::<Fr>::commit(&ck, &[labeled_poly.clone()], None).unwrap();
 
-    let point = rand_point(Some(num_vars), rand_chacha);
+        let point = rand_point(Some(num_vars), rand_chacha);
 
-    let value = labeled_poly.evaluate(&point);
+        let value = labeled_poly.evaluate(&point);
 
-    // The only arguments to test_naysay_aux we intend to change are the
-    // dishonesty and the expected type of naysayer proof returned
-    let test_naysay_with = |dishonesty, expected_naysayer_proof| {
-        let new_value = if dishonesty != LinearCodeDishonesty::Evaluation {
-            value
-        } else {
-            value + Fr::ONE
+        // The only arguments to test_naysay_aux we intend to change are the
+        // dishonesty and the expected type of naysayer proof returned
+        let test_naysay_with = |dishonesty, expected_naysayer_proof| {
+            let new_value = if dishonesty != LinearCodeDishonesty::Evaluation {
+                value
+            } else {
+                value + Fr::ONE
+            };
+
+            let proof = dishonest_open_lcpcs::<
+                MultilinearLigero<_, _, SparseMultilinearExtension<Fr>, _>,
+                _,
+                _,
+                _,
+                _,
+            >(
+                &ck,
+                &coms[0],
+                &com_states[0],
+                &point,
+                &mut test_sponge.clone(),
+                dishonesty,
+            );
+
+            test_naysay_aux::<Fr, SparseMultilinearExtension<Fr>, TestMLLigero<Fr>>(
+                &vk,
+                &coms,
+                &point,
+                [new_value],
+                &mut test_sponge.clone(),
+                proof.unwrap(),
+                expected_naysayer_proof,
+            );
         };
 
-        let proof = dishonest_open_lcpcs::<
-            MultilinearLigero<_, _, SparseMultilinearExtension<Fr>, _>,
-            _,
-            _,
-            _,
-            _,
-        >(
-            &ck,
-            &coms[0],
-            &com_states[0],
-            &point,
-            &mut test_sponge.clone(),
-            dishonesty,
+        /***************** Case 1 *****************/
+        // Honest proof verifies and is not naysaid
+        test_naysay_with(LinearCodeDishonesty::None, None);
+
+        /***************** Case 2 *****************/
+        // Sponge produces different column indices than those in the proof
+        test_naysay_with(
+            LinearCodeDishonesty::RowLCOutside,
+            Some(LinearCodeNaysayerProof {
+                incorrect_proof_index: 0,
+                naysayer_proof_single: super::LinearCodeNaysayerProofSingle::PathIndexAssertion(0),
+            }),
         );
 
-        test_naysay_aux::<Fr, SparseMultilinearExtension<Fr>, TestMLLigero<Fr>>(
+        /***************** Case 3 *****************/
+        // Linear encoding pre-image is tampered with post-proof, leading to an
+        // inconsistent sponge
+        test_naysay_with(
+            LinearCodeDishonesty::RowLCInside,
+            Some(LinearCodeNaysayerProof {
+                incorrect_proof_index: 0,
+                naysayer_proof_single: LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(0),
+            }),
+        );
+
+        /***************** Case 4 *****************/
+        // Column index is correct, but column values are not
+        test_naysay_with(
+            LinearCodeDishonesty::Column,
+            Some(LinearCodeNaysayerProof {
+                incorrect_proof_index: 0,
+                naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathAssertion(0),
+            }),
+        );
+
+        /***************** Case 5 *****************/
+        // Merkle path proof is tampered with
+        test_naysay_with(
+            LinearCodeDishonesty::MerklePath,
+            Some(LinearCodeNaysayerProof {
+                incorrect_proof_index: 0,
+                naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathAssertion(0),
+            }),
+        );
+
+        /***************** Case 6 *****************/
+        // Merkle path index is manually changed
+        test_naysay_with(
+            LinearCodeDishonesty::MerkleLeafIndex(17),
+            Some(LinearCodeNaysayerProof {
+                incorrect_proof_index: 0,
+                naysayer_proof_single: LinearCodeNaysayerProofSingle::PathIndexAssertion(17),
+            }),
+        );
+
+        /***************** Case 7 *****************/
+        // Claimed evaluation is incorrect
+        test_naysay_with(
+            LinearCodeDishonesty::Evaluation,
+            Some(LinearCodeNaysayerProof {
+                incorrect_proof_index: 0,
+                naysayer_proof_single: LinearCodeNaysayerProofSingle::EvaluationAssertion,
+            }),
+        );
+
+        /***************** Case 8 *****************/
+        // Verifier returns false when the proof is correct
+        let possible_naysayer_proofs = vec![
+            LinearCodeNaysayerProofSingle::PathIndexAssertion(0),
+            LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(0),
+            LinearCodeNaysayerProofSingle::MerklePathAssertion(0),
+            LinearCodeNaysayerProofSingle::EvaluationAssertion,
+            LinearCodeNaysayerProofSingle::PathIndexAssertion(100),
+            LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(100),
+            LinearCodeNaysayerProofSingle::MerklePathAssertion(100),
+        ];
+
+        let possible_naysayer_proofs = possible_naysayer_proofs
+            .into_iter()
+            .map(|naysayer_proof_single| LinearCodeNaysayerProof {
+                incorrect_proof_index: 0,
+                naysayer_proof_single,
+            })
+            .collect::<Vec<_>>();
+
+        test_invalid_naysayer_proofs::<Fr, SparseMultilinearExtension<Fr>, TestMLLigero<Fr>>(
             &vk,
+            &ck,
+            [&labeled_poly.clone()],
             &coms,
+            &com_states,
             &point,
-            [new_value],
             &mut test_sponge.clone(),
-            proof.unwrap(),
-            expected_naysayer_proof,
+            possible_naysayer_proofs,
         );
-    };
-
-    /***************** Case 1 *****************/
-    // Honest proof verifies and is not naysaid
-    test_naysay_with(LinearCodeDishonesty::None, None);
-
-    /***************** Case 2 *****************/
-    // Sponge produces different column indices than those in the proof
-    test_naysay_with(
-        LinearCodeDishonesty::RowLCOutside,
-        Some(LinearCodeNaysayerProof {
-            incorrect_proof_index: 0,
-            naysayer_proof_single: super::LinearCodeNaysayerProofSingle::PathIndexAssertion(0),
-        }),
-    );
-
-    /***************** Case 3 *****************/
-    // Linear encoding pre-image is tampered with post-proof, leading to an
-    // inconsistent sponge
-    test_naysay_with(
-        LinearCodeDishonesty::RowLCInside,
-        Some(LinearCodeNaysayerProof {
-            incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(0),
-        }),
-    );
-
-    /***************** Case 4 *****************/
-    // Column index is correct, but column values are not
-    test_naysay_with(
-        LinearCodeDishonesty::Column,
-        Some(LinearCodeNaysayerProof {
-            incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathAssertion(0),
-        }),
-    );
-
-    /***************** Case 5 *****************/
-    // Merkle path proof is tampered with
-    test_naysay_with(
-        LinearCodeDishonesty::MerklePath,
-        Some(LinearCodeNaysayerProof {
-            incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::MerklePathAssertion(0),
-        }),
-    );
-
-    /***************** Case 6 *****************/
-    // Merkle path index is manually changed
-    test_naysay_with(
-        LinearCodeDishonesty::MerkleLeafIndex(17),
-        Some(LinearCodeNaysayerProof {
-            incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::PathIndexAssertion(17),
-        }),
-    );
-
-    /***************** Case 7 *****************/
-    // Claimed evaluation is incorrect
-    test_naysay_with(
-        LinearCodeDishonesty::Evaluation,
-        Some(LinearCodeNaysayerProof {
-            incorrect_proof_index: 0,
-            naysayer_proof_single: LinearCodeNaysayerProofSingle::EvaluationAssertion,
-        }),
-    );
-
-    /***************** Case 8 *****************/
-    // Verifier returns false when the proof is correct
-    let possible_naysayer_proofs = vec![
-        LinearCodeNaysayerProofSingle::PathIndexAssertion(0),
-        LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(0),
-        LinearCodeNaysayerProofSingle::MerklePathAssertion(0),
-        LinearCodeNaysayerProofSingle::EvaluationAssertion,
-        LinearCodeNaysayerProofSingle::PathIndexAssertion(100),
-        LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(100),
-        LinearCodeNaysayerProofSingle::MerklePathAssertion(100),
-    ];
-
-    let possible_naysayer_proofs = possible_naysayer_proofs
-        .into_iter()
-        .map(|naysayer_proof_single| LinearCodeNaysayerProof {
-            incorrect_proof_index: 0,
-            naysayer_proof_single,
-        })
-        .collect::<Vec<_>>();
-
-    test_invalid_naysayer_proofs::<Fr, SparseMultilinearExtension<Fr>, TestMLLigero<Fr>>(
-        &vk,
-        &ck,
-        [&labeled_poly.clone()],
-        &coms,
-        &com_states,
-        &point,
-        &mut test_sponge.clone(),
-        possible_naysayer_proofs,
-    );
+    }
 }

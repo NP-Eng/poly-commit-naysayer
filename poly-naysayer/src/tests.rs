@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use ark_crypto_primitives::sponge::CryptographicSponge;
 use ark_ff::{Field, PrimeField};
 use ark_poly::{MultilinearExtension, Polynomial, SparseMultilinearExtension};

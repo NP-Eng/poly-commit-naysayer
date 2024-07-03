@@ -40,7 +40,7 @@ const MIN_NUM_VARS: usize = 12;
 const MAX_NUM_VARS: usize = 22;
 
 fn bench_pcs(c: &mut Criterion) {
-    bench_method!(c, verify, Ligero<Fr>, rand_ml_poly, rand_ml_point);
+    bench_method!(c, verify_naysay, Ligero<Fr>, rand_ml_poly, rand_ml_point);
 }
 
 
