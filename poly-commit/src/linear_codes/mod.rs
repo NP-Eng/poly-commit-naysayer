@@ -487,7 +487,6 @@ where
             }
 
             if inner_product(&proof.opening.v, &a) != value {
-                eprintln!("Function check: claimed value in position {i} does not match the evaluation of the committed polynomial in the same position");
                 return Ok(false);
             }
         }
