@@ -39,4 +39,11 @@ type Ligero<F> = LinearCodePCS<
 const MIN_NUM_VARS: usize = 12;
 const MAX_NUM_VARS: usize = 22;
 
-bench!(Ligero<Fr>, rand_ml_poly, rand_ml_point);
+fn bench_pcs(c: &mut Criterion) {
+    bench_method!(c, verify, Ligero<Fr>, rand_ml_poly, rand_ml_point);
+}
+
+
+criterion_group!(benches, bench_pcs);
+
+criterion_main!(benches);
