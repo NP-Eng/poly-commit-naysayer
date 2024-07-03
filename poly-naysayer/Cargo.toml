@@ -33,6 +33,11 @@ ark-pcs-bench-templates = { path = "../bench-templates" }
 path = "../poly-commit"
 features = [ "test-types" ]
 
+[[bench]]
+name = "ligero_ml_times"
+path = "benches/ligero_ml_times.rs"
+harness = false
+
 [features]
 default = [ "std", "parallel" ]
 std = [ "ark-ff/std", "ark-ec/std", "ark-poly/std", "ark-std/std", "ark-serialize/std", "ark-crypto-primitives/std"]
