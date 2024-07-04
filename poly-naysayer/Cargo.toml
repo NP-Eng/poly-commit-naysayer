@@ -34,8 +34,8 @@ path = "../poly-commit"
 features = [ "test-types" ]
 
 [[bench]]
-name = "ligero_ml_times"
-path = "benches/ligero_ml_times.rs"
+name = "ligero_ml_naysayer"
+path = "benches/ligero_ml_naysayer.rs"
 harness = false
 
 [features]

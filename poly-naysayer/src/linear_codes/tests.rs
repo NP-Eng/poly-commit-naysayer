@@ -246,7 +246,9 @@ mod tests {
             LinearCodeDishonesty::RowLCInside,
             Some(LinearCodeNaysayerProof {
                 incorrect_proof_index: 0,
-                naysayer_proof_single: LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(0),
+                naysayer_proof_single: LinearCodeNaysayerProofSingle::ColumnInnerProductAssertion(
+                    0,
+                ),
             }),
         );
 
