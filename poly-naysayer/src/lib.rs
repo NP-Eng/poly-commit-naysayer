@@ -15,7 +15,6 @@ mod utils;
 
 pub mod tests;
 
-
 type NaysayerError = ark_poly_commit::Error;
 
 /// Naysayer interface for polynomial commitment schemes
