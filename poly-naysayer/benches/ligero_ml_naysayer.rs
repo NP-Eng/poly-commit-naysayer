@@ -125,48 +125,46 @@ pub fn bench_naysay_ligero_ml(num_vars: usize) {
         )
     };
 
+    let (honest_proof, _, vk, coms, point, claimed_eval) = setup_bench(LinearCodeDishonesty::None);
+
     let run_honest_benchmark = |id: &str| {
         let mut c = Criterion::default();
         let mut group = c.benchmark_group("Ligero ML");
         group.bench_function(id, |b| {
-            b.iter_batched(
-                || setup_bench(LinearCodeDishonesty::None),
-                |(dishonest_proof, _, vk, coms, point, claimed_eval)| {
-                    TestMLLigero::<Fr>::check(
-                        &vk,
-                        &coms,
-                        &point,
-                        claimed_eval,
-                        &dishonest_proof,
-                        &mut test_sponge(),
-                        None,
-                    )
-                },
-                BatchSize::SmallInput,
-            )
+            b.iter(|| {
+                TestMLLigero::<Fr>::check(
+                    &vk,
+                    &coms,
+                    &point,
+                    claimed_eval,
+                    &honest_proof,
+                    &mut test_sponge(),
+                    None,
+                )
+            })
         });
     };
 
     let run_dishonest_benchmark = |id: &str, dishonesty: LinearCodeDishonesty| {
+        let (dishonest_proof, naysayer_proof, vk, coms, point, claimed_eval) =
+            setup_bench(dishonesty.clone());
+        let naysayer_proof = naysayer_proof.unwrap();
+
         let mut c = Criterion::default();
         let mut group = c.benchmark_group("Naysayer Ligero ML");
         group.bench_function(id, |b| {
-            b.iter_batched(
-                || setup_bench(dishonesty.clone()),
-                |(dishonest_proof, naysayer_proof, vk, coms, point, claimed_eval)| {
-                    TestMLLigero::<Fr>::verify_naysay(
-                        &vk,
-                        &coms,
-                        &point,
-                        claimed_eval,
-                        &dishonest_proof,
-                        &naysayer_proof.unwrap(),
-                        &mut test_sponge(),
-                        None,
-                    )
-                },
-                BatchSize::SmallInput,
-            )
+            b.iter(|| {
+                TestMLLigero::<Fr>::verify_naysay(
+                    &vk,
+                    &coms,
+                    &point,
+                    claimed_eval,
+                    &dishonest_proof,
+                    &naysayer_proof,
+                    &mut test_sponge(),
+                    None,
+                )
+            })
         });
     };
 
