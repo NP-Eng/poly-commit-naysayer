@@ -1,4 +1,4 @@
-use ark_ff::PrimeField;
+use ark_ff::{BigInteger, PrimeField};
 
 use ark_poly_commit::linear_codes::{
     calculate_t, get_indices_from_sponge, LinCodeParametersInfo, LinearCodePCS, LinearEncode,
@@ -22,7 +22,7 @@ pub mod tests;
 
 /// Naysayer proof for a single LinCodePCProof (corresponding to one opening),
 /// indicating which piece of the opening proof is incorrect
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum LinearCodeNaysayerProofSingle {
     /// Mismatch between the index of the Merkle path provided and the challenge
     /// index squeezed from the sponge
@@ -41,10 +41,10 @@ pub enum LinearCodeNaysayerProofSingle {
 /// referring to multiple LinearCodePCS openings), which includes both the index
 /// of the opening proof that is incorrect and the naysayer proof for that
 /// opening
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct LinearCodeNaysayerProof {
-    incorrect_proof_index: usize,
-    naysayer_proof_single: LinearCodeNaysayerProofSingle,
+    pub incorrect_proof_index: usize,
+    pub naysayer_proof_single: LinearCodeNaysayerProofSingle,
 }
 
 impl<L, F, P, C, H> PCSNaysayer<F, P> for LinearCodePCS<L, F, P, C, H>
@@ -96,14 +96,24 @@ where
             let root = &commitment.root;
             let t = calculate_t::<F>(vk.sec_param(), vk.distance(), n_ext_cols)?;
 
-            sponge
-                .absorb(&to_bytes!(&commitment.root).map_err(|_| NaysayerError::TranscriptError)?);
+            sponge.absorb(&commitment.root);
 
             // 1. Seed the transcript with the point and the recieved vector
-            // TODO Consider removing the evaluation point from the transcript.
             let point_vec = L::point_to_vec(point.clone());
-            sponge.absorb(&point_vec);
-            sponge.absorb(&proof.opening.v);
+            sponge.absorb(
+                &point_vec
+                    .iter()
+                    .map(|x| x.into_bigint().to_bytes_be())
+                    .collect::<Vec<Vec<u8>>>(),
+            );
+            sponge.absorb(
+                &proof
+                    .opening
+                    .v
+                    .iter()
+                    .map(|x| x.into_bigint().to_bytes_be())
+                    .collect::<Vec<Vec<u8>>>(),
+            );
 
             // 2. Ask random oracle for the `t` indices where the checks happen.
             let indices = get_indices_from_sponge(n_ext_cols, t, sponge)?;

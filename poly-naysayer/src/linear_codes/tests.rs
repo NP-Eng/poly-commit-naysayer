@@ -5,7 +5,7 @@ use ark_crypto_primitives::{
     merkle_tree::Config,
     sponge::{Absorb, CryptographicSponge},
 };
-use ark_ff::{Field, PrimeField};
+use ark_ff::{BigInteger, Field, PrimeField};
 use ark_poly::evaluations::multivariate::SparseMultilinearExtension;
 use ark_poly::Polynomial;
 use ark_std::test_rng;
@@ -96,10 +96,15 @@ where
     // 3. Generate vector `b` to left-multiply the matrix.
     let (_, b) = L::tensor(point, n_cols, n_rows);
 
-    sponge.absorb(&to_bytes!(&commitment.root).map_err(|_| NaysayerError::TranscriptError)?);
+    sponge.absorb(&commitment.root);
 
     let point_vec = L::point_to_vec(point.clone());
-    sponge.absorb(&point_vec);
+    sponge.absorb(
+        &point_vec
+            .iter()
+            .map(|x| x.into_bigint().to_bytes_be())
+            .collect::<Vec<Vec<u8>>>(),
+    );
 
     // left-multiply the matrix by `b` - possibly dishonestly
     let mut v = mat.row_mul(&b);
@@ -108,7 +113,11 @@ where
         v[0] += F::one();
     }
 
-    sponge.absorb(&v);
+    sponge.absorb(
+        &v.iter()
+            .map(|x| x.into_bigint().to_bytes_be())
+            .collect::<Vec<Vec<u8>>>(),
+    );
 
     // computing the number of queried columns
     let t = calculate_t::<F>(ck.sec_param(), ck.distance(), ext_mat.m)?;
