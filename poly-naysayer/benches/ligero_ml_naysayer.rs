@@ -3,7 +3,7 @@
 use ark_bn254::Fr;
 use ark_crypto_primitives::sponge::{Absorb, CryptographicSponge};
 use ark_ff::UniformRand;
-use ark_pcs_bench_templates::{criterion_main, BatchSize, Criterion};
+use ark_pcs_bench_templates::{criterion_main, Criterion};
 use ark_poly::{MultilinearExtension, SparseMultilinearExtension};
 use ark_poly_commit::{
     linear_codes::{LinCodeParametersInfo, MultilinearLigero},
