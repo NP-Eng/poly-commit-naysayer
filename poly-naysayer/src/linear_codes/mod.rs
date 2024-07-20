@@ -18,6 +18,7 @@ use crate::{utils::inner_product, NaysayerError, PCSNaysayer};
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
 
+#[cfg(any(test, feature = "test-types"))]
 pub mod tests;
 
 /// Naysayer proof for a single LinCodePCProof (corresponding to one opening),

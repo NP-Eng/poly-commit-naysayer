@@ -9,27 +9,19 @@ use ark_crypto_primitives::{
 };
 use ark_poly::Polynomial;
 
-use ark_bls12_377::Fr;
-use ark_ff::{Field, PrimeField};
-use ark_poly::evaluations::multivariate::SparseMultilinearExtension;
-use ark_std::test_rng;
-use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
+use ark_ff::{PrimeField};
 
-use super::{LinearCodeNaysayerProof, LinearCodeNaysayerProofSingle};
 
 use ark_poly_commit::{
     linear_codes::{
         calculate_t, create_merkle_tree, get_indices_from_sponge, LPCPArray, LinCodePCCommitment,
         LinCodePCCommitmentState, LinCodePCProof, LinCodePCProofSingle, LinCodeParametersInfo,
-        LinearEncode, MultilinearLigero,
+        LinearEncode,
     },
-    test_sponge,
-    test_types::TestMLLigero,
-    to_bytes, LabeledCommitment, LabeledPolynomial, PolynomialCommitment,
+    to_bytes, LabeledCommitment,
 };
 
 use crate::{
-    tests::{rand_point, rand_poly, test_invalid_naysayer_proofs, test_naysay_aux},
     NaysayerError,
 };
 

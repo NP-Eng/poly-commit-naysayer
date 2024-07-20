@@ -8,11 +8,10 @@ use ark_poly_commit::{LabeledCommitment, PolynomialCommitment};
 
 use ark_std::{fmt::Debug, rand::RngCore};
 
-use rand_chacha::ChaCha20Rng;
-
 pub mod linear_codes;
 mod utils;
 
+#[cfg(any(test, feature = "test-types"))]
 pub mod tests;
 
 type NaysayerError = ark_poly_commit::Error;
