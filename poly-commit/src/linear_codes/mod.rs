@@ -1,7 +1,7 @@
 use crate::utils::{inner_product, Matrix};
 use crate::{
-    to_bytes, Error, LabeledCommitment, LabeledPolynomial, PCCommitterKey, PCUniversalParams,
-    PCVerifierKey, PolynomialCommitment,
+    Error, LabeledCommitment, LabeledPolynomial, PCCommitterKey, PCUniversalParams, PCVerifierKey,
+    PolynomialCommitment,
 };
 
 use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
@@ -10,6 +10,7 @@ use ark_crypto_primitives::{
     merkle_tree::Config,
     sponge::{Absorb, CryptographicSponge},
 };
+use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use ark_poly::Polynomial;
 use ark_std::borrow::Borrow;
@@ -23,24 +24,25 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 
 mod utils;
 
+mod multilinear_brakedown;
+mod multilinear_ligero;
+mod univariate_ligero;
+
 pub use multilinear_brakedown::MultilinearBrakedown;
 pub use multilinear_ligero::MultilinearLigero;
 pub use univariate_ligero::UnivariateLigero;
 
+mod brakedown;
+mod data_structures;
+mod ligero;
+
+use data_structures::*;
 pub use data_structures::{
     BrakedownPCParams, LPCPArray, LigeroPCParams, LinCodePCCommitment, LinCodePCCommitmentState,
     LinCodePCProof, LinCodePCProofSingle,
 };
+
 pub use utils::{calculate_t, get_indices_from_sponge};
-
-use data_structures::*;
-
-mod brakedown;
-mod data_structures;
-mod ligero;
-mod multilinear_brakedown;
-mod multilinear_ligero;
-mod univariate_ligero;
 
 const FIELD_SIZE_ERROR: &str = "This field is not suitable for the proposed parameters";
 
@@ -344,7 +346,7 @@ where
             // 3. Generate vector `b` to left-multiply the matrix.
             let (_, b) = L::tensor(point, n_cols, n_rows);
 
-            sponge.absorb(&to_bytes!(&commitment.root).map_err(|_| Error::TranscriptError)?);
+            sponge.absorb(&commitment.root);
 
             // If we are checking well-formedness, we need to compute the well-formedness proof (which is just r.M) and append it to the transcript.
             let well_formedness = if ck.check_well_formedness() {
@@ -358,7 +360,12 @@ where
             };
 
             let point_vec = L::point_to_vec(point.clone());
-            sponge.absorb(&point_vec);
+            sponge.absorb(
+                &point_vec
+                    .iter()
+                    .map(|x| x.into_bigint().to_bytes_be())
+                    .collect::<Vec<Vec<u8>>>(),
+            );
 
             proof_array.push(LinCodePCProof {
                 // Compute the opening proof and append b.M to the transcript.
@@ -404,7 +411,7 @@ where
             let root = &commitment.root;
             let t = calculate_t::<F>(vk.sec_param(), vk.distance(), n_ext_cols)?;
 
-            sponge.absorb(&to_bytes!(&commitment.root).map_err(|_| Error::TranscriptError)?);
+            sponge.absorb(&commitment.root);
 
             let out = if vk.check_well_formedness() {
                 if proof.well_formedness.is_none() {
@@ -423,8 +430,20 @@ where
 
             // 1. Seed the transcript with the point and the recieved vector
             let point_vec = L::point_to_vec(point.clone());
-            sponge.absorb(&point_vec);
-            sponge.absorb(&proof.opening.v);
+            sponge.absorb(
+                &point_vec
+                    .iter()
+                    .map(|x| x.into_bigint().to_bytes_be())
+                    .collect::<Vec<Vec<u8>>>(),
+            );
+            sponge.absorb(
+                &proof
+                    .opening
+                    .v
+                    .iter()
+                    .map(|x| x.into_bigint().to_bytes_be())
+                    .collect::<Vec<Vec<u8>>>(),
+            );
 
             // 2. Ask random oracle for the `t` indices where the checks happen.
             let indices = get_indices_from_sponge(n_ext_cols, t, sponge)?;
@@ -487,6 +506,7 @@ where
             }
 
             if inner_product(&proof.opening.v, &a) != value {
+                eprintln!("Function check: claimed value in position {i} does not match the evaluation of the committed polynomial in the same position");
                 return Ok(false);
             }
         }
@@ -495,8 +515,8 @@ where
     }
 }
 
-/// Create a Merkle tree from the given leaves
 // TODO maybe this can go to utils
+/// Create a Merkle tree from a vector of leaves.
 pub fn create_merkle_tree<C>(
     leaves: &mut Vec<C::Leaf>,
     leaf_hash_param: &<<C as Config>::LeafHash as CRHScheme>::Parameters,
@@ -531,7 +551,11 @@ where
 
     // 1. left-multiply the matrix by `b`.
     let v = mat.row_mul(b);
-    sponge.absorb(&v);
+    sponge.absorb(
+        &v.iter()
+            .map(|x| x.into_bigint().to_bytes_be())
+            .collect::<Vec<Vec<u8>>>(),
+    );
 
     // 2. Generate t column indices to test the linear combination on.
     let indices = get_indices_from_sponge(ext_mat.m, t, sponge)?;

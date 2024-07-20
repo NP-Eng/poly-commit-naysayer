@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 use ark_crypto_primitives::sponge::CryptographicSponge;
 use ark_ff::PrimeField;
@@ -7,12 +8,12 @@ use ark_poly_commit::{LabeledCommitment, PolynomialCommitment};
 
 use ark_std::{fmt::Debug, rand::RngCore};
 
-pub mod linear_codes;
+use rand_chacha::ChaCha20Rng;
 
+pub mod linear_codes;
 mod utils;
 
-#[cfg(test)]
-mod tests;
+pub mod tests;
 
 type NaysayerError = ark_poly_commit::Error;
 

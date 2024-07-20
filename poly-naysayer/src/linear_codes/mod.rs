@@ -18,12 +18,11 @@ use crate::{utils::inner_product, NaysayerError, PCSNaysayer};
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
 
-#[cfg(test)]
-mod tests;
+pub mod tests;
 
 /// Naysayer proof for a single LinCodePCProof (corresponding to one opening),
 /// indicating which piece of the opening proof is incorrect
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub enum LinearCodeNaysayerProofSingle {
     /// Mismatch between the index of the Merkle path provided and the challenge
     /// index squeezed from the sponge
@@ -42,10 +41,10 @@ pub enum LinearCodeNaysayerProofSingle {
 /// referring to multiple LinearCodePCS openings), which includes both the index
 /// of the opening proof that is incorrect and the naysayer proof for that
 /// opening
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub struct LinearCodeNaysayerProof {
-    pub incorrect_proof_index: usize,
-    pub naysayer_proof_single: LinearCodeNaysayerProofSingle,
+    incorrect_proof_index: usize,
+    naysayer_proof_single: LinearCodeNaysayerProofSingle,
 }
 
 impl<L, F, P, C, H> PCSNaysayer<F, P> for LinearCodePCS<L, F, P, C, H>
