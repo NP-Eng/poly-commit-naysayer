@@ -1,3 +1,5 @@
+#![cfg(feature = "test-types")]
+
 use ark_bn254::Fr;
 use ark_crypto_primitives::sponge::{Absorb, CryptographicSponge};
 use ark_ff::UniformRand;

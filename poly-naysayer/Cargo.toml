@@ -43,3 +43,4 @@ harness = false
 default = [ "std", "parallel" ]
 std = [ "ark-ff/std", "ark-ec/std", "ark-poly/std", "ark-std/std", "ark-serialize/std", "ark-crypto-primitives/std"]
 parallel = [ "std", "ark-ff/parallel", "ark-ec/parallel", "ark-poly/parallel", "ark-std/parallel", "rayon", "rand" ]
+test-types = [ "ark-poly-commit/test-types" ]
